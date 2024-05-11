@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock, call
-from tests.helpers import ConfigMock
-from data.batch import Batches, BatchTokenize, Split
-from data.tokenizer import EHRTokenizer
+from ehr2vec.tests.helpers import ConfigMock
+from ehr2vec.data.batch import Batches, BatchTokenize, Split
+from ehr2vec.data.tokenizer import EHRTokenizer
 
 class TestBatches(unittest.TestCase):
     @patch('data.batch.load_exclude_pids', return_value=['100'])

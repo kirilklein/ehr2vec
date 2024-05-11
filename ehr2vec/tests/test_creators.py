@@ -1,8 +1,8 @@
 import unittest
-from tests.helpers import ConfigMock
+from ehr2vec.tests.helpers import ConfigMock
 import pandas as pd
 from datetime import datetime
-from data.creators import BaseCreator, AgeCreator, AbsposCreator, SegmentCreator, BackgroundCreator
+from ehr2vec.data.creators import AgeCreator, AbsposCreator, SegmentCreator, BackgroundCreator, DeathDateCreator
 
 
 class TestBaseCreator(unittest.TestCase):
@@ -22,18 +22,9 @@ class TestBaseCreator(unittest.TestCase):
         self.patients_info = pd.DataFrame({
             'PID': ['1', '2', '3'],
             'BIRTHDATE': pd.to_datetime(['2000-01-02', '2000-03-20', '2000-05-08']),
+            'DATE_OF_DEATH': pd.to_datetime(['2020-01-02', '2021-03-20', '2022-05-08']),
             'GENDER': ['Male', 'Female', 'Male']
         })
-
-    def test_birthdate_column(self):
-        basecreator = BaseCreator(self.cfg)
-        patients_info_pure = pd.DataFrame({'BIRTHDATE': []})
-        patients_info_convert = pd.DataFrame({'DATE_OF_BIRTH': []})
-        patients_info_false = pd.DataFrame({'NOTHING': []})
-        self.assertIn('BIRTHDATE', basecreator._rename_birthdate_column(patients_info_pure))
-        self.assertIn('BIRTHDATE', basecreator._rename_birthdate_column(patients_info_convert))
-        with self.assertRaises(KeyError):
-            basecreator._rename_birthdate_column(patients_info_false)
 
     def test_age_creator(self):
         creator = AgeCreator(self.cfg)

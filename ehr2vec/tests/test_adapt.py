@@ -1,5 +1,5 @@
 import unittest
-from data_fixes.adapt import BehrtAdapter
+from ehr2vec.data_fixes.adapt import BehrtAdapter
 
 class TestBehrtAdapter(unittest.TestCase):
 
