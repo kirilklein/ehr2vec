@@ -1,34 +1,34 @@
 import itertools
+import logging
 import pandas as pd
 from ehr2vec.data.utils import Utilities
 
+logger = logging.getLogger(__name__)
 
 class BaseCreator:
     def __init__(self, config: dict):
         self.config = config
 
     def __call__(self, concepts: pd.DataFrame, patients_info: pd.DataFrame)-> pd.DataFrame:
-        patients_info = self._rename_birthdate_column(patients_info)
         return self.create(concepts, patients_info)
     
     def create(self, concepts: pd.DataFrame, patients_info: pd.DataFrame)-> pd.DataFrame:
         raise NotImplementedError
     
     @staticmethod
-    def _rename_birthdate_column(patients_info: pd.DataFrame):
-         # Create PID -> BIRTHDATE dict
-        if 'BIRTHDATE' not in patients_info.columns:
-            if 'DATE_OF_BIRTH' in patients_info.columns:
-                return patients_info.rename(columns={'DATE_OF_BIRTH': 'BIRTHDATE'})
-            else:
-                raise KeyError('BIRTHDATE column not found in patients_info')
-        return patients_info
+    def find_column(patients_info: pd.DataFrame, match: str):
+        """Check if a column containing the match string exists in patients_info and return it."""
+        columns = patients_info.columns.str.lower().str.contains(match.lower())
+        if any(columns):
+            return patients_info.columns[columns][0]
+        raise KeyError(f'No column containing "{match}" found in patients_info')
 
 class AgeCreator(BaseCreator):
     feature = id = 'age'
     def create(self, concepts: pd.DataFrame, patients_info: pd.DataFrame)-> pd.DataFrame:
-        patients_info = self._rename_birthdate_column(patients_info)
-        birthdates = pd.Series(patients_info['BIRTHDATE'].values, index=patients_info['PID']).to_dict()
+        birthdate_col = self.find_column(patients_info, 'birth')
+        logger.info(f'Creating age feature using birthdate column: {birthdate_col}')
+        birthdates = pd.Series(patients_info[birthdate_col].values, index=patients_info['PID']).to_dict()
         # Calculate approximate age
         ages = (concepts['TIMESTAMP'] - concepts['PID'].map(birthdates)).dt.days / 365.25
         if self.config.age.get('round'):
@@ -63,7 +63,7 @@ class BackgroundCreator(BaseCreator):
     id = 'background'
     prepend_token = "BG_"
     def create(self, concepts: pd.DataFrame, patients_info: pd.DataFrame)-> pd.DataFrame:
-        self._rename_birthdate_column(patients_info)
+        birthdate_column = self.find_column(patients_info, 'birth')
         # Create background concepts
         background = {
             'PID': patients_info['PID'].tolist() * len(self.config.background),
@@ -78,10 +78,41 @@ class BackgroundCreator(BaseCreator):
             background['AGE'] = -1
 
         if 'abspos' in self.config:
-            abspos = Utilities.get_abspos_from_origin_point(patients_info['BIRTHDATE'], self.config.abspos)
+            abspos = Utilities.get_abspos_from_origin_point(patients_info[birthdate_column], self.config.abspos)
             background['ABSPOS'] = abspos.to_list() * len(self.config.background)
 
         # Prepend background to concepts
         background = pd.DataFrame(background)
         return pd.concat([background, concepts])
+
+class DeathDateCreator(BaseCreator):
+    id = 'death'
+    def create(self, concepts: pd.DataFrame, patients_info: pd.DataFrame)-> pd.DataFrame:
+        logger.setLevel(logging.INFO)
+        birthdate_col = self.find_column(patients_info, 'birth')
+        deathdate_col = self.find_column(patients_info, 'death')
+        logger.info(f'Creating death feature using birthdate column: {birthdate_col} and deathdate column: {deathdate_col}')
+        
+        last_segments = concepts.groupby('PID')['SEGMENT'].last().to_dict()
+
+        # Calculate age at death
+        ages_at_death = (patients_info[deathdate_col] - patients_info[birthdate_col]).dt.days / 365.25
+        if self.config.age.get('round'):
+            ages_at_death = ages_at_death.round(self.config.age.get('round'))
+
+        # Calculate abspos at death
+        abspos_at_death = Utilities.get_abspos_from_origin_point(patients_info[deathdate_col], self.config.abspos)
+
+        # Create death info
+        death_info = {
+            'PID': patients_info['PID'].tolist(),
+            'CONCEPT': ['Death'] * len(patients_info),
+            'AGE': ages_at_death.tolist(),
+            'ABSPOS': abspos_at_death.tolist(),
+            'SEGMENT': [last_segments[pid] for pid in patients_info['PID']]
+        }
+
+        # Append death info to concepts
+        death_info = pd.DataFrame(death_info)
+        return pd.concat([concepts, death_info])
 

@@ -14,8 +14,9 @@ class FeatureMaker:
         self.order = {
             'background': -1
         }
-        self.creators = {creator.id: creator for creator in BaseCreator.__subclasses__() if creator.id in self.config.keys()}
-        assert len(self.creators) == len(self.config.keys()), f'Found {len(self.creators)} creators but {len(self.config.keys())} were expected.'
+        self.creator_names = list(self.config.keys())+['death']
+        self.creators = {creator.id: creator for creator in BaseCreator.__subclasses__() if creator.id in self.creator_names}
+        assert len(self.creators) == len(self.creator_names), f'Found {len(self.creators)} creators but {len(self.creator_names)} were expected.'
         self.pipeline = self.create_pipeline()
         
 
@@ -31,7 +32,7 @@ class FeatureMaker:
         """Create the pipeline of feature creators."""
         # Pipeline creation
         pipeline = []
-        for id in self.config:
+        for id in self.creators:
             creator = self.creators[id](self.config)
             pipeline.append(creator)
             if getattr(creator, 'feature', None) is not None:
