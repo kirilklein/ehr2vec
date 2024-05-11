@@ -50,7 +50,6 @@ class DatasetPreparer:
         train_dataset = MLMDataset(train_data.features, train_data.vocabulary, **self.cfg.data.dataset)
         val_dataset = MLMDataset(val_data.features, train_data.vocabulary, **self.cfg.data.dataset)
 
-        
         return train_dataset, val_dataset
 
     def prepare_finetune_data(self) -> Data:
@@ -85,49 +84,50 @@ class DatasetPreparer:
             if data_cfg.get('gender'):
                 data = self.utils.process_data(data, self.patient_filter.select_by_gender)
             
-            # 4. Loading and processing outcomes
+            # 3. Loading and processing outcomes
             outcomes, censor_outcomes = self.loader.load_outcomes()
             logger.info("Assigning outcomes to data")
             data = self.utils.process_data(data, self._retrieve_and_assign_outcomes, log_positive_patients_num=True,
                                             args_for_func={'outcomes': outcomes, 'censor_outcomes': censor_outcomes})
 
-            # 5. Optional: select patients of interest
+            # 4. Optional: select censored patients
             if data_cfg.get("select_censored"):
                 data = self.utils.process_data(data, self.patient_filter.select_censored, log_positive_patients_num=True)
 
-            # 6. Optional: Filter patients with outcome before censoring
+            # 5. Optional: Filter patients with outcome before censoring
             if self.cfg.outcome.type != self.cfg.outcome.get('censor_type', None):
                 data = self.utils.process_data(data, self.patient_filter.filter_outcome_before_censor, log_positive_patients_num=True) # !Timeframe (earlier instance of outcome)
 
-            # 7. Optional: Filter code types
+            # 6. Optional: Filter code types
             if data_cfg.get('code_types'):
                 data = self.utils.process_data(data, self.code_type_filter.filter)
                 data = self.utils.process_data(data, self.patient_filter.exclude_short_sequences, log_positive_patients_num=True)
 
-        # 8. Data censoring
+        # 7. Data censoring
         data = self.utils.process_data(data, self.data_modifier.censor_data, log_positive_patients_num=True,
                                                args_for_func={'n_hours': self.cfg.outcome.n_hours})
         if not predefined_pids:
-            # 3. Optional: Select Patients By Age
+            # Optional: Select Patients By Age
             if data_cfg.get('min_age') or data_cfg.get('max_age'):
                 data = self.utils.process_data(data, self.patient_filter.select_by_age)
         
-        # 9. Exclude patients with less than k concepts
+        # 8. Exclude short sequences
         data = self.utils.process_data(data, self.patient_filter.exclude_short_sequences, log_positive_patients_num=True)
-
+        # 9. Exclude dead patients
+        data = self.utils.process_data(data, self.patient_filter.exclude_dead_patients, log_positive_patients_num=True)
         # 10. Optional: Patient selection
         if data_cfg.get('num_patients') and not predefined_pids:
             data = self.utils.process_data(data, self.patient_filter.select_random_subset, log_positive_patients_num=True,
                                               args_for_func={'num_patients':data_cfg.num_patients})
 
-        # 12. Truncation
+        # 11. Truncation
         logger.info(f"Truncating data to {data_cfg.truncation_len} tokens")
         data = self.utils.process_data(data, self.data_modifier.truncate, args_for_func={'truncation_len': data_cfg.truncation_len})
 
-        # 13. Normalize segments
+        # 12. Normalize segments
         data = self.utils.process_data(data, self.data_modifier.normalize_segments)
 
-        # 14. Optional: Remove any unwanted features
+        # 13. Optional: Remove any unwanted features
         if 'remove_features' in data_cfg:
             for feature in data_cfg.remove_features:
                 logger.info(f"Removing {feature}")

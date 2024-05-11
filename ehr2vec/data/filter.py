@@ -93,6 +93,11 @@ class PatientFilter:
         kept_indices = excluder._exclude(data.features)
         return self.select_entries(data, kept_indices)
 
+    def exclude_dead_patients(self, data: Data) -> Data:
+        """Exclude patients with less than k concepts"""
+        kept_indices = [i for i, concepts in enumerate(data.features['concept']) if 'Death' not in set(concepts)]
+        return self.select_entries(data, kept_indices)
+
     def select_by_age(self, data: Data) -> Data:
         """
         We retrieve the age of each patient at censor date and check whether it's within the range.
