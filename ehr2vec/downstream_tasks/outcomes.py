@@ -16,8 +16,8 @@ class OutcomeMaker:
         self, concepts_plus: pd.DataFrame, patients_info: pd.DataFrame, patient_set: List[str]
     )->dict:
         """Create outcomes from concepts_plus and patients_info"""
-        concepts_plus = concepts_plus[concepts_plus.PID.isin(patient_set)]
-        patients_info = patients_info[patients_info.PID.isin(patient_set)]
+        concepts_plus = self.filter_table_by_pids(concepts_plus, patient_set)
+        patients_info = self.filter_table_by_pids(patients_info, patient_set)
         concepts_plus = self.remove_missing_timestamps(concepts_plus)
  
         outcome_tables = {}
@@ -33,6 +33,10 @@ class OutcomeMaker:
             outcome_tables[outcome] = timestamps
         return outcome_tables
     
+    @staticmethod
+    def filter_table_by_pids(table: pd.DataFrame, pids: List[str])->pd.DataFrame:
+        return table[table.PID.isin(pids)]
+
     @staticmethod
     def remove_missing_timestamps(concepts_plus: pd.DataFrame )->pd.DataFrame:
         return concepts_plus[concepts_plus.TIMESTAMP.notna()]
@@ -60,20 +64,31 @@ class OutcomeMaker:
         col_booleans = []
         for typ, lst in zip(types, matches):
             if match_how=='startswith':
-                if not case_sensitive:
-                    lst = [x.lower() for x in lst]
-                
-                col_bool = concepts_plus[typ].astype(str).str.startswith(tuple(lst), False)
-            
+                col_bool = OutcomeMaker.startswith_match(concepts_plus, typ, lst, case_sensitive)
             elif match_how == 'contains':
-                col_bool = pd.Series([False] * len(concepts_plus), index=concepts_plus.index)
-                for item in lst:
-                    pattern = item if case_sensitive else item.lower()
-                    if case_sensitive:
-                        col_bool |= concepts_plus[typ].astype(str).str.contains(pattern, na=False)
-                    else:
-                        col_bool |= concepts_plus[typ].astype(str).str.lower().str.contains(pattern, na=False)
+                col_bool = OutcomeMaker.contains_match(concepts_plus, typ, lst, case_sensitive)
             else:
                 raise ValueError(f"match_how must be startswith or contains, not {match_how}")
             col_booleans.append(col_bool)
         return col_booleans
+    
+    @staticmethod
+    def startswith_match(df: pd.DataFrame, column: str, patterns: List[str], case_sensitive: bool) -> pd.Series:
+        """Match strings using startswith"""
+        if not case_sensitive:
+            patterns = [x.lower() for x in patterns]
+            return df[column].astype(str).str.lower().str.startswith(tuple(patterns), False)
+        return df[column].astype(str).str.startswith(tuple(patterns), False)
+    
+    @staticmethod
+    def contains_match(df: pd.DataFrame, column: str, patterns: List[str], case_sensitive: bool) -> pd.Series:
+        """Match strings using contains"""
+        col_bool = pd.Series([False] * len(df), index=df.index)
+        for pattern in patterns:
+            if not case_sensitive:
+                pattern = pattern.lower()
+            if case_sensitive:
+                col_bool |= df[column].astype(str).str.contains(pattern, na=False) 
+            else: 
+                col_bool |= df[column].astype(str).str.lower().str.contains(pattern, na=False)
+        return col_bool

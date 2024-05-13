@@ -4,7 +4,6 @@ from collections import defaultdict
 from os.path import join
 
 import pandas as pd
-import torch
 from tqdm import tqdm
 
 from ehr2vec.common.azure import AzurePathContext, save_to_blobstore
