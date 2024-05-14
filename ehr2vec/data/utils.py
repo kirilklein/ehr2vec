@@ -18,7 +18,7 @@ BG_GENDER_KEYS = {
 }
 MIN_POSITIVES = {'finetune': 1, None: 1}
 CHECKPOINT_FOLDER = 'checkpoints'
-ORIGIN_POINT = {'year': 2020, 'month': 1, 'day': 26, 'hour': 0, 'minute': 0, 'second': 0}
+
 
 
 class Utilities:
@@ -38,20 +38,10 @@ class Utilities:
         logger.info(f"{len(data.pids)} patients")
 
     @staticmethod
-    def select_and_order_outcomes_for_patients(all_outcomes: Dict, pids: List, outcome: Union[str, dict]) -> List:
+    def select_and_order_outcomes_for_patients(outcomes: Dict, pids: List) -> List:
         """Select outcomes for patients and order them based on the order of pids"""
-        outcome_pids = all_outcomes[PID_KEY]
-        if isinstance(outcome, str):
-            outcome_group = all_outcomes[outcome]
-        elif isinstance(outcome, dict): # For temporal censoring (censoring equally at a date)
-            outcome_datetime = datetime(**outcome)
-            logger.warning(f"Using {ORIGIN_POINT} as origin point. Check whether it is the same as used for feature creation.")
-            outcome_abspos = Utilities.get_abspos_from_origin_point([outcome_datetime], ORIGIN_POINT)
-            outcome_group = outcome_abspos * len(outcome_pids)
-        else:
-            raise ValueError(f"Unknown outcome type {type(outcome)}")
-        assert len(outcome_pids) == len(outcome_group), "Mismatch between PID_KEY length and outcome_group length"
-
+        outcome_pids = list(outcomes.keys())
+        outcome_group = list(outcomes.values())
         # Create a dictionary of positions for each PID for quick lookup
         pid_to_index = {pid: idx for idx, pid in enumerate(outcome_pids)}
         
@@ -272,7 +262,7 @@ class Utilities:
         """
         ages_at_censor_date = []
         
-        for abspos, age, censor_date in zip(data.features['abspos'], data.features['age'], data.censor_outcomes):
+        for abspos, age, censor_date in zip(data.features['abspos'], data.features['age'], data.index_dates):
             if censor_date is None:
                 ages_at_censor_date.append(age[-1]) # if no censoring, we take the last age
                 continue
@@ -298,7 +288,7 @@ class Utilities:
         trajectory_lengths = []
         special_tokens = set([data.vocabulary[token] for token in data.vocabulary\
                                if token.startswith(('[', 'BG_'))])
-        for abspos, concept, censor_date in zip(data.features['abspos'], data.features['age'], data.censor_outcomes):
+        for abspos, concept, censor_date in zip(data.features['abspos'], data.features['age'], data.index_dates):
             first_concept_index = Utilities.get_first_non_special_token_index(concept, special_tokens)
             trajectory_length_hours = censor_date - abspos[first_concept_index]
             trajectory_length_days = trajectory_length_hours / 24 

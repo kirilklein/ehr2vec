@@ -2,13 +2,13 @@
 import logging
 import os
 from os.path import join
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
 
-from ehr2vec.common.config import Config, instantiate, load_config
+from ehr2vec.common.config import Config, load_config
 from ehr2vec.common.loader import (FeaturesLoader, get_pids_file,
                                    load_and_select_splits, load_exclude_pids)
 from ehr2vec.common.saver import Saver
@@ -18,6 +18,8 @@ from ehr2vec.data.filter import CodeTypeFilter, PatientFilter
 from ehr2vec.data.utils import Utilities
 from ehr2vec.data_fixes.handle import Handler
 from ehr2vec.data_fixes.truncate import Truncator
+from ehr2vec.data_fixes.censor import Censorer
+from ehr2vec.downstream_tasks.outcomes import OutcomeHandler
 
 logger = logging.getLogger(__name__)  # Get the logger for this module
 
@@ -75,7 +77,7 @@ class DatasetPreparer:
                 if 'model_path' not in self.cfg.paths:
                     raise ValueError("Model path must be provided if no finetune_config in predefined splits folder.")
                 original_config = load_config(join(self.cfg.paths.model_path, 'finetune_config.yaml'))
-            self.cfg.outcome.n_hours = original_config.outcome.n_hours
+            self.cfg.outcome = original_config.outcome
             data = self._select_predefined_pids(data)
             self._load_outcomes_to_data(data)
 
@@ -85,49 +87,48 @@ class DatasetPreparer:
                 data = self.utils.process_data(data, self.patient_filter.select_by_gender)
             
             # 3. Loading and processing outcomes
-            outcomes, censor_outcomes = self.loader.load_outcomes()
-            logger.info("Assigning outcomes to data")
-            data = self.utils.process_data(data, self._retrieve_and_assign_outcomes, log_positive_patients_num=True,
-                                            args_for_func={'outcomes': outcomes, 'censor_outcomes': censor_outcomes})
-
-            # 4. Optional: select censored patients
-            if data_cfg.get("select_censored"):
-                data = self.utils.process_data(data, self.patient_filter.select_censored, log_positive_patients_num=True)
-
-            # 5. Optional: Filter patients with outcome before censoring
-            if self.cfg.outcome.type != self.cfg.outcome.get('censor_type', None):
-                data = self.utils.process_data(data, self.patient_filter.filter_outcome_before_censor, log_positive_patients_num=True) # !Timeframe (earlier instance of outcome)
-
-            # 6. Optional: Filter code types
+            outcome_dates, exposure_dates = self.loader.load_outcomes_and_exposures()
+            outcomehandler = OutcomeHandler(
+                index_date=self.cfg.outcome.get('index_date', None),
+                select_patient_group=data_cfg.get("select_patient_group", None), # exposed/unexposed
+                drop_pids_w_outcome_pre_followup=self.cfg.outcome.get("first_time_outcomes_only", False))
+            data = outcomehandler.handle(
+                data,
+                outcome_dates, 
+                exposure_dates, 
+                )
+            
+            # 4. Optional: Filter code types
             if data_cfg.get('code_types'):
                 data = self.utils.process_data(data, self.code_type_filter.filter)
                 data = self.utils.process_data(data, self.patient_filter.exclude_short_sequences, log_positive_patients_num=True)
 
-        # 7. Data censoring
-        data = self.utils.process_data(data, self.data_modifier.censor_data, log_positive_patients_num=True,
-                                               args_for_func={'n_hours': self.cfg.outcome.n_hours})
+        # 5. Data censoring
+        data = self.utils.process_data(data, self.data_modifier.censor_data, log_positive_patients_num=True)
+        # 6. Exclude short sequences
+        data = self.utils.process_data(data, self.patient_filter.exclude_short_sequences, log_positive_patients_num=True)
+
         if not predefined_pids:
-            # Optional: Select Patients By Age
+            # 7. Optional: Select Patients By Age
             if data_cfg.get('min_age') or data_cfg.get('max_age'):
                 data = self.utils.process_data(data, self.patient_filter.select_by_age)
         
-        # 8. Exclude short sequences
-        data = self.utils.process_data(data, self.patient_filter.exclude_short_sequences, log_positive_patients_num=True)
-        # 9. Exclude dead patients
+        # 8. Exclude dead patients
         data = self.utils.process_data(data, self.patient_filter.exclude_dead_patients, log_positive_patients_num=True)
-        # 10. Optional: Patient selection
+        
+        # 9. Optional: Patient selection
         if data_cfg.get('num_patients') and not predefined_pids:
             data = self.utils.process_data(data, self.patient_filter.select_random_subset, log_positive_patients_num=True,
                                               args_for_func={'num_patients':data_cfg.num_patients})
 
-        # 11. Truncation
+        # 10. Truncation
         logger.info(f"Truncating data to {data_cfg.truncation_len} tokens")
         data = self.utils.process_data(data, self.data_modifier.truncate, args_for_func={'truncation_len': data_cfg.truncation_len})
 
-        # 12. Normalize segments
+        # 11. Normalize segments
         data = self.utils.process_data(data, self.data_modifier.normalize_segments)
 
-        # 13. Optional: Remove any unwanted features
+        # 12. Optional: Remove any unwanted features
         if 'remove_features' in data_cfg:
             for feature in data_cfg.remove_features:
                 logger.info(f"Removing {feature}")
@@ -201,14 +202,6 @@ class DatasetPreparer:
         X, y = OneHotEncoder.encode(data, token2index)
         return X, y, new_vocab
 
-    def _retrieve_and_assign_outcomes(self, data: Data, outcomes: Dict, censor_outcomes: Dict)->Data:
-        """Retrieve outcomes and assign them to the data instance"""
-        data.outcomes = self.utils.select_and_order_outcomes_for_patients(outcomes, data.pids, self.cfg.outcome.type)
-        if self.cfg.outcome.get('censor_type') is not None:
-            data.censor_outcomes = self.utils.select_and_order_outcomes_for_patients(censor_outcomes, data.pids, self.cfg.outcome.censor_type)
-        else:
-            data.censor_outcomes = [None]*len(outcomes)
-        return data
     @staticmethod
     def _get_predefined_pids(predefined_splits_path)->List:
         """Return pids from predefined splits"""
@@ -230,7 +223,7 @@ class DatasetPreparer:
     
     def _load_outcomes_to_data(self, data: Data)->None:
         """ Load outcomes and censor outcomes to data. """
-        for outcome_type in ['outcomes', 'censor_outcomes']:
+        for outcome_type in ['outcomes', 'index_dates']:
             setattr(data, outcome_type, torch.load(join(self.cfg.paths.predefined_splits, f'{outcome_type}.pt')))
 
     def _log_features(self, data:Data)->None:
@@ -238,6 +231,7 @@ class DatasetPreparer:
         logger.info("Example features: ")
         for k, v in data.features.items():
             logger.info(f"{k}: {v[0]}")
+    
 
 class OneHotEncoder:
     @staticmethod
@@ -290,12 +284,12 @@ class DataModifier:
         data.features = truncator(data.features)
         return data
 
-    def censor_data(self, data: Data, n_hours: float) -> Data:
+    def censor_data(self, data: Data) -> Data:
         """Censors data n_hours after censor_outcome."""
-        censorer_cfg = self.cfg.data.get('censorer', {'_target_': 'data_fixes.censor.Censorer'})
-        censorer = instantiate(censorer_cfg, vocabulary=data.vocabulary, n_hours=n_hours)
-        logger.info(f"Censoring data {n_hours} hours after outcome with {censorer.__class__.__name__}")
-        data.features, data.censor_outcomes = censorer(data.features, data.censor_outcomes, exclude=False)
+        n_hours = self.cfg.outcome.get('n_hours', 0) 
+        logger.info(f"Censoring data {n_hours} hours after index date.")
+        censorer = Censorer(n_hours=n_hours, vocabulary=data.vocabulary)
+        data.features = censorer(data.features, data.index_dates)
         return data
 
     @staticmethod
@@ -309,19 +303,4 @@ class DataModifier:
 
         return data
 
-def retrieve_outcomes(all_outcomes: Dict, all_censor_outcomes: Dict, cfg: Config)->Union[List, List]:
-    """From the configuration, load the outcomes and censor outcomes."""
-    pids = all_outcomes[PID_KEY]
-    outcomes = all_outcomes.get(cfg.outcome.type, [None]*len(all_outcomes[PID_KEY]))
-    censor_outcomes = all_censor_outcomes.get(cfg.outcome.get('censor_type'), [None]*len(outcomes))
-    return outcomes, censor_outcomes, pids
-
-def select_positives(outcomes: List, censor_outcomes: List, pids: List)->Tuple[List, List, List]:
-    """Select only positive outcomes."""
-    logger.info("Selecting only positive outcomes")
-    select_indices = set([i for i, outcome in enumerate(outcomes) if pd.notna(outcome)])
-    outcomes = [outcomes[i] for i in select_indices]
-    censor_outcomes = [censor_outcomes[i] for i in select_indices]
-    pids = [pids[i] for i in select_indices]
-    return outcomes, censor_outcomes, pids
 

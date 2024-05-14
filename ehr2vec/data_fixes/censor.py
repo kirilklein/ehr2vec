@@ -1,33 +1,27 @@
-import random
-import pandas as pd
 from typing import List, Union
 
+import pandas as pd
+
 from ehr2vec.common.utils import iter_patients
-from ehr2vec.data_fixes.exclude import Excluder
 
 
 class Censorer:
-    def __init__(self, n_hours: int, min_len: int = 3, vocabulary:dict=None) -> None:
+    def __init__(self, n_hours: int, vocabulary:dict=None) -> None:
         """Censor the features based on the event timestamp.
         n_hours if positive, censor all items that occur n_hours after event."""
         self.n_hours = n_hours
         self.vocabulary = vocabulary
-        self.excluder = Excluder(min_len=min_len, vocabulary=vocabulary)
 
-    def __call__(self, features: dict, censor_outcomes: list, exclude: bool = True) -> tuple:
-        features = self.censor(features, censor_outcomes)
-        if exclude:
-            features, _, kept_indices = self.excluder(features, None)
-            return features, kept_indices
-        else:
-            return features, censor_outcomes
+    def __call__(self, features: dict, censorings: list) -> tuple:
+        features = self.censor(features, censorings)
+        return features
 
-    def censor(self, features: dict, censor_outcomes: list) -> dict:
+    def censor(self, features: dict, censorings: list) -> dict:
         """Censor the features based on the censor outcomes."""
         censored_features = {key: [] for key in features}
         for i, patient in enumerate(iter_patients(features)):
-            censor_timestamp = censor_outcomes[i]
-            censored_patient = self._censor(patient, censor_timestamp)
+            censor_timestamp = censorings[i]
+            censored_patient = self._censor_patient(patient, censor_timestamp)
 
             # Append to censored features
             for key, value in censored_patient.items():
@@ -35,7 +29,7 @@ class Censorer:
 
         return censored_features
 
-    def _censor(self, patient: dict, event_timestamp: float) -> dict:
+    def _censor_patient(self, patient: dict, event_timestamp: float) -> dict:
         """Censor the patient's features based on the event timestamp."""
         if not pd.isna(event_timestamp):
             # Extract the attention mask and determine the number of non-masked items
@@ -92,16 +86,4 @@ class Censorer:
         return concepts and isinstance(concepts[0], int)
 
 
-class EQ_Censorer(Censorer):
-        
-    def __call__(self, features: dict, censor_outcomes: list, exclude: bool = True) -> dict:
-        censor_outcomes = self.get_censor_outcomes_for_negatives(censor_outcomes)
-        return super().__call__(features, censor_outcomes, exclude)
-
-    @staticmethod
-    def get_censor_outcomes_for_negatives(censor_outcomes: list) -> list:
-        """Use distribution of censor times to generate censor times for negative patients."""
-        positive_censor_outcomes = [t for t in censor_outcomes if pd.notna(t)]
-        random.seed(42)
-        return [t if pd.notna(t) else random.choice(positive_censor_outcomes) for t in censor_outcomes]
 

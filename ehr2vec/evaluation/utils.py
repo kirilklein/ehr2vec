@@ -188,7 +188,7 @@ def save_data(data: Data, folder:str)->None:
         torch.save(data.features, join(folder, f'{data.mode}_features.pt'))
         if data.outcomes is not None:
             torch.save(data.outcomes, join(folder, f'{data.mode}_outcomes.pt'))
-        if data.censor_outcomes is not None:
-            torch.save(data.censor_outcomes, join(folder, f'{data.mode}_censor_outcomes.pt'))
+        if data.index_dates is not None:
+            torch.save(data.index_dates, join(folder, f'{data.mode}_index_dates.pt'))
     else:
         logger.warning(f"No data to save in {data.mode}")

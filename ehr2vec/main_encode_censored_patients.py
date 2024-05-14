@@ -26,13 +26,14 @@ args = get_args(CONFIG_PATH, "encode_censored")
 config_path = args.config_path
 config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_path)
 
+# !TODO: adjust this, use functions from Directorypreparer.
 def _get_output_path_name(dataset, cfg):
     num_patients = str(int((len(dataset))/1000))+'k'
-    if cfg.outcome.censor_type:
-        days = True if abs(cfg.outcome.n_hours)>48 else False
-        window = int(abs(cfg.outcome.n_hours/24)) if days else abs(cfg.outcome.n_hours)
+    if cfg.path.exposure:
+        days = True if abs(cfg.outcome.n_hours_censoring)>48 else False
+        window = int(abs(cfg.outcome.n_hours_censoring/24)) if days else abs(cfg.outcome.n_hours_censoring)
         days_hours = 'days' if days else 'hours'
-        pre_post = 'pre' if cfg.outcome.n_hours<0 else 'post'
+        pre_post = 'pre' if cfg.outcome.n_hours_<0 else 'post'
         return f"{cfg.outcome.type}_Patients_{num_patients}_Censor_{window}{days_hours}_{pre_post}_{cfg.outcome.censor_type}"
     else:
         if cfg.outcome.type:
