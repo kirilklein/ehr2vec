@@ -137,7 +137,7 @@ class OutcomeHandler:
          6. Select first outcome after start of follow-up for each patient
          7. Assign outcome- and index dates to data.
         """
-
+        self.check_input(outcomes, exposures)
         # Step 1: Filter to include only relevant patients
         outcomes = self.filter_outcomes_by_pids(outcomes, data, 'outcomes')
         exposures = self.filter_outcomes_by_pids(exposures, data, 'censoring timestamps')
@@ -168,6 +168,13 @@ class OutcomeHandler:
         data = self.assign_exposures_and_outcomes_to_data(data, index_dates, outcomes)
         return data
     
+    def check_input(outcomes, exposures):
+        """Check that outcomes and exposures have columns PID and TIMESTAMP."""
+        if 'PID' not in outcomes.columns or 'TIMESTAMP' not in outcomes.columns:
+            raise ValueError("Outcomes must have columns PID and TIMESTAMP.")
+        if 'PID' not in exposures.columns or 'TIMESTAMP' not in exposures.columns:
+            raise ValueError("Exposures must have columns PID and TIMESTAMP.")
+        
     @staticmethod
     def filter_outcomes_by_pids(outcomes: pd.DataFrame, data: Data, type_info:str='')->pd.DataFrame:
         """Filter outcomes to include only patients in the data."""

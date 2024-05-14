@@ -47,7 +47,8 @@ class TestPatientFilter(unittest.TestCase):
         self.cfg.data.max_age = 120
         self.cfg.data.gender = 'male'
         self.cfg.paths.pretrain_model_path = '/path/to/pretrain_model'
-        self.cfg.outcome.n_hours = 24
+        self.cfg.outcome.n_hours_censoring = 24
+        
         self.filter = PatientFilter(self.cfg)
 
         self.data = Mock()

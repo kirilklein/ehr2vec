@@ -1,8 +1,12 @@
 import unittest
-from ehr2vec.tests.helpers import ConfigMock
-import pandas as pd
 from datetime import datetime
-from ehr2vec.data.creators import AgeCreator, AbsposCreator, SegmentCreator, BackgroundCreator, DeathDateCreator
+
+import pandas as pd
+
+from ehr2vec.data.creators import (AbsposCreator, AgeCreator,
+                                   BackgroundCreator, DeathDateCreator,
+                                   SegmentCreator)
+from ehr2vec.tests.helpers import ConfigMock
 
 
 class TestBaseCreator(unittest.TestCase):

@@ -1,10 +1,12 @@
 import unittest
+
 from ehr2vec.data_fixes.censor import Censorer
+
 
 class TestCensorer(unittest.TestCase):
 
     def setUp(self):
-        self.censorer = Censorer(n_hours=1, min_len=3)
+        self.censorer = Censorer(n_hours=1)
 
     def test_censor(self):
         features = {

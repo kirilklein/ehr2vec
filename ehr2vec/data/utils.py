@@ -38,21 +38,6 @@ class Utilities:
         logger.info(f"{len(data.pids)} patients")
 
     @staticmethod
-    def select_and_order_outcomes_for_patients(outcomes: Dict, pids: List) -> List:
-        """Select outcomes for patients and order them based on the order of pids"""
-        outcome_pids = list(outcomes.keys())
-        outcome_group = list(outcomes.values())
-        # Create a dictionary of positions for each PID for quick lookup
-        pid_to_index = {pid: idx for idx, pid in enumerate(outcome_pids)}
-        
-        outcome_pids = set(outcome_pids)
-        if not set(pids).issubset(outcome_pids):
-            logger.warn(f"PIDs is not a subset of outcome PIDs, there is a mismatch of {len(set(pids).difference(outcome_pids))} patients") 
-        
-        outcomes = [outcome_group[pid_to_index[pid]] if pid in outcome_pids else None for pid in pids]
-        return outcomes
-
-    @staticmethod
     def get_abspos_from_origin_point(timestamps: Union[pd.Series, List[datetime]], 
                                      origin_point: Dict[str, int])->Union[pd.Series, List[float]]:
         """Get the absolute position in hours from the origin point"""
@@ -176,22 +161,6 @@ class Utilities:
         val_pids = pids[train_size:]
 
         return train_features, train_pids, val_features, val_pids
-
-    @staticmethod
-    def filter_and_order_outcomes(outcomes_dic:Dict[str, Dict], pids: List):
-        """outcomes_dic: groups of outcomes, every group contains another dictionary with pids and outcomes"""
-        ordered_outcomes = {}
-        for _, outcomes_group in outcomes_dic.items():
-            for outcome_name, _ in outcomes_group.items():
-                if outcome_name =='PID':
-                    continue
-                outcome_temp = Utilities.select_and_order_outcomes_for_patients(
-                    all_outcomes=outcomes_group, pids = pids, outcome=outcome_name)
-                assert len(outcome_temp)==len(pids), "Pids and outcomes do not have the same number of patients"
-                ordered_outcomes[outcome_name] = outcome_temp
-
-        del outcome_temp
-        return ordered_outcomes
 
     @staticmethod
     def iter_patients(data) -> Generator[dict, dict, dict]:

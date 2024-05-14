@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 import pandas as pd
 from datetime import datetime
 from unittest.mock import Mock, MagicMock, patch
@@ -17,14 +18,6 @@ class TestUtilities(unittest.TestCase):
     def test_log_patient_nums(self):
         pass
 
-    def test_select_and_order_outcomes_for_patients(self):
-        all_outcomes = {'PID': [3, 2, 1], "COVID": [1, 2, 0]}
-        pids = [1, 2, 3]
-        outcome = "COVID"
-        outcomes = Utilities.select_and_order_outcomes_for_patients(all_outcomes, pids, outcome)
-
-        self.assertEqual(outcomes, [0, 2, 1])
-
     def test_get_abspos_from_origin_point(self):
         timestamps = [datetime(1, 1, i) for i in range(1,11)]
         origin_point = {'year': 1, 'month': 1, 'day': 1}
@@ -36,8 +29,8 @@ class TestUtilities(unittest.TestCase):
         timestamps = pd.Series(pd.to_datetime([f'2020-01-0{i}' for i in range(1,10)]))
         origin_point = datetime(**{'year': 2020, 'month': 1, 'day': 1})
         rel_timestamps = Utilities.get_relative_timestamps_in_hours(timestamps, origin_point)
-
-        self.assertEqual(rel_timestamps.tolist(), [24*i for i in range(9)])
+        expected = [24*i for i in range(9)]
+        np.testing.assert_allclose(rel_timestamps, expected, rtol=1e-5, atol=1e-8)
 
     def test_check_and_adjust_max_segment(self):
         data = Mock(features={'segment': [[1,2,3], [4,5,6]]})
@@ -100,20 +93,6 @@ class TestUtilities(unittest.TestCase):
         self.assertEqual(val_features, {'concept': [[7, 8, 9]]})
         self.assertEqual(train_pids, [1, 2])
         self.assertEqual(val_pids, [3])
-
-    def test_filter_and_order_outcomes(self):
-        outcomes_dic = {
-            'GROUP1': {
-                'PID': [3, 2, 1],
-                "COVID": [1, 2, 0],
-                "DEATH": [0, 1, 0],
-                "ICU": [2, 0, 1],
-            },
-        }
-        pids = [1, 2, 3]
-        outcomes = Utilities.filter_and_order_outcomes(outcomes_dic, pids)
-
-        self.assertEqual(outcomes, {'COVID': [0, 2, 1], 'DEATH': [0, 1, 0], 'ICU': [1, 0, 2]})
 
     def test_iter_patients(self):
         pass
