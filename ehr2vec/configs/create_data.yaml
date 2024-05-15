@@ -20,7 +20,7 @@ features:
     year: 2020
     month: 1
     day: 26
-  segment: true
+  segment: True
   background: ['GENDER']
 
 tokenizer:
