@@ -97,7 +97,6 @@ class OutcomeMaker:
             else: 
                 col_bool |= df[column].astype(str).str.lower().str.contains(pattern, na=False)
         return col_bool
-# !TODO: finish OutcomeHandler
 class OutcomeHandler:
     ORIGIN_POINT = {'year': 2020, 'month': 1, 'day': 26, 'hour': 0, 'minute': 0, 'second': 0}
     def __init__(self, 
