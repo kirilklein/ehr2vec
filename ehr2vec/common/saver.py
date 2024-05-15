@@ -64,8 +64,8 @@ class Saver:
         torch.save(data.vocabulary, join(self.run_folder, 'vocabulary.pt'))
         if data.outcomes is not None:
             torch.save(data.outcomes, join(self.run_folder, 'outcomes.pt'))
-        if data.censor_outcomes is not None:
-            torch.save(data.censor_outcomes, join(self.run_folder, 'censor_outcomes.pt'))
+        if data.index_dates is not None:
+            torch.save(data.index_dates, join(self.run_folder, 'index_dates.pt'))
     
     def save_list(self, list_: list, name: str)->None:
         """Save a list to a file"""

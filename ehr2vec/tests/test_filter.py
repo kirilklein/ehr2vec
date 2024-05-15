@@ -47,7 +47,8 @@ class TestPatientFilter(unittest.TestCase):
         self.cfg.data.max_age = 120
         self.cfg.data.gender = 'male'
         self.cfg.paths.pretrain_model_path = '/path/to/pretrain_model'
-        self.cfg.outcome.n_hours = 24
+        self.cfg.outcome.n_hours_censoring = 24
+        
         self.filter = PatientFilter(self.cfg)
 
         self.data = Mock()
@@ -55,7 +56,7 @@ class TestPatientFilter(unittest.TestCase):
                               'age': [[10, 20, 30], [40, 50, 130], [120, 130, 140]],
                               'abspos':[[-1, 49.5, 51], [-1, 1, 2], [41.5, 51.0, 52]]}
         self.data.outcomes = [None, 100, 200]
-        self.data.censor_outcomes = [50, None, 50]
+        self.data.index_dates = [50, None, 50]
         self.data.pids = ['pid1', 'pid2', 'pid3']
         self.data.vocabulary = {f"code{i}": i for i in range(2, 9)}
         self.data.vocabulary["BG_GENDER_Female"] = 0

@@ -1,10 +1,12 @@
 import unittest
-from ehr2vec.data_fixes.censor import Censorer, EQ_Censorer
+
+from ehr2vec.data_fixes.censor import Censorer
+
 
 class TestCensorer(unittest.TestCase):
 
     def setUp(self):
-        self.censorer = Censorer(n_hours=1, min_len=3)
+        self.censorer = Censorer(n_hours=1)
 
     def test_censor(self):
         features = {
@@ -12,13 +14,13 @@ class TestCensorer(unittest.TestCase):
             'abspos': [[0, 0, 0, 1, 1, 2, 3, 3]],
             'attention_mask': [[1, 1, 1, 1, 1, 1, 1, 1]]   
         }
-        censor_outcomes = [1]
+        index_dates = [1]
         expected_result = {
             'concept': [['[CLS]', 'BG_GENDER_Male', '[SEP]', 'Diagnosis1', '[SEP]', 'Diagnosis2']],
             'abspos': [[0, 0, 0, 1, 1, 2]],
             'attention_mask': [[1, 1, 1, 1, 1, 1]]
         }
-        result = self.censorer.censor(features, censor_outcomes)
+        result = self.censorer.censor(features, index_dates)
         self.assertEqual(result, expected_result)
 
     def test_if_tokenized(self):
@@ -41,22 +43,6 @@ class TestCensorer(unittest.TestCase):
         censor_flags = self.censorer._generate_censor_flags(abspos, background_flags, event_timestamp)
 
         self.assertEqual(censor_flags, [True, True, True, True, True, True, False, False])
-
-class TestEQCensorer(unittest.TestCase):
-
-    def setUp(self):
-        self.eq_censorer = EQ_Censorer(n_hours=1, min_len=3)
-
-    def test_get_censor_outcomes_for_negatives_reproducibility(self):
-        censor_outcomes = [1.0, None, 2.0, None, 3.0, None, 4.0, None, None, None, None, None, None, None, None, None, None, None, None, None]
-        result = self.eq_censorer.get_censor_outcomes_for_negatives(censor_outcomes)
-        result2 = self.eq_censorer.get_censor_outcomes_for_negatives(censor_outcomes)
-
-        # Check that all patients are censored now
-        self.assertNotIn(None, result)
-
-        # Check reproducibility
-        self.assertEqual(result, result2)
 
 
 if __name__ == '__main__':

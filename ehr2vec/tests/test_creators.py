@@ -1,8 +1,13 @@
 import unittest
-from ehr2vec.tests.helpers import ConfigMock
-import pandas as pd
 from datetime import datetime
-from ehr2vec.data.creators import AgeCreator, AbsposCreator, SegmentCreator, BackgroundCreator, DeathDateCreator
+
+import pandas as pd
+
+from ehr2vec.data.creators import (AbsposCreator, AgeCreator,
+                                   BackgroundCreator, DeathCreator,
+                                   SegmentCreator)
+from ehr2vec.data.utils import Utilities
+from ehr2vec.tests.helpers import ConfigMock
 
 
 class TestBaseCreator(unittest.TestCase):
@@ -59,6 +64,33 @@ class TestBaseCreator(unittest.TestCase):
         self.assertIn('ABSPOS', result.columns)
         for _, patient in result.groupby("PID"):
             self.assertEqual(patient.CONCEPT.str.startswith('BG_').sum(), len(self.cfg.background))
+
+    def test_death_date_creator(self):
+        # Ensure SEGMENT is added to the concepts DataFrame
+        segment_creator = SegmentCreator(self.cfg)
+        concepts_with_segment = segment_creator.create(self.concepts, self.patients_info)
+        
+        # Now test DeathDateCreator
+        creator = DeathCreator(self.cfg)
+        result = creator.create(concepts_with_segment, self.patients_info)
+        
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertIn('CONCEPT', result.columns)
+        self.assertIn('AGE', result.columns)
+        self.assertIn('ABSPOS', result.columns)
+        self.assertIn('SEGMENT', result.columns)
+        
+        death_entries = result[result['CONCEPT'] == 'Death']
+        self.assertEqual(len(death_entries), len(self.patients_info))
+        
+        expected_ages = ((self.patients_info['DATE_OF_DEATH'] - self.patients_info['BIRTHDATE']).dt.days / 365.25).round(2).tolist()
+        self.assertEqual(death_entries['AGE'].tolist(), expected_ages)
+        
+        abspos_at_death = Utilities.get_abspos_from_origin_point(self.patients_info['DATE_OF_DEATH'], self.cfg.abspos)
+        self.assertEqual(death_entries['ABSPOS'].tolist(), abspos_at_death.tolist())
+        
+        for pid in self.patients_info['PID']:
+            self.assertEqual(death_entries[death_entries['PID'] == pid]['SEGMENT'].iloc[0], concepts_with_segment[concepts_with_segment['PID'] == pid]['SEGMENT'].iloc[-1])
 
 if __name__ == '__main__':
     unittest.main()

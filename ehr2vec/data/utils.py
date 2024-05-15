@@ -18,7 +18,7 @@ BG_GENDER_KEYS = {
 }
 MIN_POSITIVES = {'finetune': 1, None: 1}
 CHECKPOINT_FOLDER = 'checkpoints'
-ORIGIN_POINT = {'year': 2020, 'month': 1, 'day': 26, 'hour': 0, 'minute': 0, 'second': 0}
+
 
 
 class Utilities:
@@ -36,31 +36,6 @@ class Utilities:
     def log_patient_nums(operation:str, data: Data)->None:
         logger.info(f"After applying {operation}:")
         logger.info(f"{len(data.pids)} patients")
-
-    @staticmethod
-    def select_and_order_outcomes_for_patients(all_outcomes: Dict, pids: List, outcome: Union[str, dict]) -> List:
-        """Select outcomes for patients and order them based on the order of pids"""
-        outcome_pids = all_outcomes[PID_KEY]
-        if isinstance(outcome, str):
-            outcome_group = all_outcomes[outcome]
-        elif isinstance(outcome, dict): # For temporal censoring (censoring equally at a date)
-            outcome_datetime = datetime(**outcome)
-            logger.warning(f"Using {ORIGIN_POINT} as origin point. Check whether it is the same as used for feature creation.")
-            outcome_abspos = Utilities.get_abspos_from_origin_point([outcome_datetime], ORIGIN_POINT)
-            outcome_group = outcome_abspos * len(outcome_pids)
-        else:
-            raise ValueError(f"Unknown outcome type {type(outcome)}")
-        assert len(outcome_pids) == len(outcome_group), "Mismatch between PID_KEY length and outcome_group length"
-
-        # Create a dictionary of positions for each PID for quick lookup
-        pid_to_index = {pid: idx for idx, pid in enumerate(outcome_pids)}
-        
-        outcome_pids = set(outcome_pids)
-        if not set(pids).issubset(outcome_pids):
-            logger.warn(f"PIDs is not a subset of outcome PIDs, there is a mismatch of {len(set(pids).difference(outcome_pids))} patients") 
-        
-        outcomes = [outcome_group[pid_to_index[pid]] if pid in outcome_pids else None for pid in pids]
-        return outcomes
 
     @staticmethod
     def get_abspos_from_origin_point(timestamps: Union[pd.Series, List[datetime]], 
@@ -188,22 +163,6 @@ class Utilities:
         return train_features, train_pids, val_features, val_pids
 
     @staticmethod
-    def filter_and_order_outcomes(outcomes_dic:Dict[str, Dict], pids: List):
-        """outcomes_dic: groups of outcomes, every group contains another dictionary with pids and outcomes"""
-        ordered_outcomes = {}
-        for _, outcomes_group in outcomes_dic.items():
-            for outcome_name, _ in outcomes_group.items():
-                if outcome_name =='PID':
-                    continue
-                outcome_temp = Utilities.select_and_order_outcomes_for_patients(
-                    all_outcomes=outcomes_group, pids = pids, outcome=outcome_name)
-                assert len(outcome_temp)==len(pids), "Pids and outcomes do not have the same number of patients"
-                ordered_outcomes[outcome_name] = outcome_temp
-
-        del outcome_temp
-        return ordered_outcomes
-
-    @staticmethod
     def iter_patients(data) -> Generator[dict, dict, dict]:
         """Iterate over patients in a features dict."""
         for i in range(len(data.features["concept"])):
@@ -272,7 +231,7 @@ class Utilities:
         """
         ages_at_censor_date = []
         
-        for abspos, age, censor_date in zip(data.features['abspos'], data.features['age'], data.censor_outcomes):
+        for abspos, age, censor_date in zip(data.features['abspos'], data.features['age'], data.index_dates):
             if censor_date is None:
                 ages_at_censor_date.append(age[-1]) # if no censoring, we take the last age
                 continue
@@ -298,7 +257,7 @@ class Utilities:
         trajectory_lengths = []
         special_tokens = set([data.vocabulary[token] for token in data.vocabulary\
                                if token.startswith(('[', 'BG_'))])
-        for abspos, concept, censor_date in zip(data.features['abspos'], data.features['age'], data.censor_outcomes):
+        for abspos, concept, censor_date in zip(data.features['abspos'], data.features['age'], data.index_dates):
             first_concept_index = Utilities.get_first_non_special_token_index(concept, special_tokens)
             trajectory_length_hours = censor_date - abspos[first_concept_index]
             trajectory_length_days = trajectory_length_hours / 24 

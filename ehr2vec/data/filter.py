@@ -72,18 +72,18 @@ class PatientFilter:
     def filter_outcome_before_censor(self, data: Data) -> Data:
         """Filter patients with outcome before censoring and missing censoring when outcome present."""
         kept_indices = []
-        for i, (outcome, censor) in enumerate(zip(data.outcomes, data.censor_outcomes)):
-            if pd.isna(censor):
+        for i, (outcome, index_date) in enumerate(zip(data.outcomes, data.index_dates)):
+            if pd.isna(index_date):
                 if pd.isna(outcome):
                     kept_indices.append(i)
-            elif pd.isna(outcome) or outcome >= (censor + self.cfg.outcome.n_hours):
+            elif pd.isna(outcome) or outcome >= (index_date + self.cfg.outcome.n_hours_censoring):
                 kept_indices.append(i)
         return self.select_entries(data, kept_indices)
     
     def select_censored(self, data: Data) -> Data:
         """Select only censored patients. This is only relevant for the fine-tuning  data. 
         E.g. for pregnancy complications select only pregnant women."""
-        kept_indices = [i for i, censor in enumerate(data.censor_outcomes) if pd.notna(censor)]
+        kept_indices = [i for i, censor in enumerate(data.index_dates) if pd.notna(censor)]
         return self.select_entries(data, kept_indices)
 
     def exclude_short_sequences(self, data: Data) -> Data:
@@ -139,8 +139,8 @@ class PatientFilter:
         data.pids = [data.pids[i] for i in indices]
         if data.outcomes is not None:
             data.outcomes = [data.outcomes[i] for i in indices]
-        if data.censor_outcomes is not None:
-            data.censor_outcomes = [data.censor_outcomes[i] for i in indices]
+        if data.index_dates is not None:
+            data.index_dates = [data.index_dates[i] for i in indices]
         return data
     
     @staticmethod

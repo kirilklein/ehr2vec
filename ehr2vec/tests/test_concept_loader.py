@@ -1,11 +1,14 @@
 import unittest
-import pandas as pd
 from unittest.mock import patch
+
+import pandas as pd
+
 from ehr2vec.data.concept_loader import ConceptLoader
 
+
 class TestConceptLoader(unittest.TestCase):
-    @patch('data.concept_loader.ConceptLoader._verify_input', return_value=None)
-    @patch('data.concept_loader.ConceptLoader._verify_paths', return_value=None)
+    @patch('ehr2vec.data.concept_loader.ConceptLoader._verify_input', return_value=None)
+    @patch('ehr2vec.data.concept_loader.ConceptLoader._verify_paths', return_value=None)
     def setUp(self, *args):
         self.conceptloader = ConceptLoader()
         #self.conceptloaderlarge = ConceptLoaderLarge() # Only need to test ConceptLoader since they share the functions

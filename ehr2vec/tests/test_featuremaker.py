@@ -22,6 +22,7 @@ class TestFeatureMaker(unittest.TestCase):
         self.patients_info = pd.DataFrame({
             'PID': ['1', '2', '3'],
             'BIRTHDATE': pd.to_datetime(['2000-01-02', '2000-03-20', '2000-05-08']),
+            'DEATHDATE': pd.to_datetime(['2010-01-02', '2029-03-20', '2040-05-08']),
             'GENDER': ['Male', 'Female', 'Male']
         })
 
@@ -39,7 +40,7 @@ class TestFeatureMaker(unittest.TestCase):
     def test_create_pipeline(self):
         pipeline = self.feature_maker.create_pipeline()
         self.assertIsInstance(pipeline, list)
-        self.assertEqual(len(pipeline), len(self.cfg))
+        self.assertEqual(len(pipeline), len(self.cfg)+1) # we add one for deathtime
 
         for key, pos in self.feature_maker.order.items():
             if key in self.cfg.keys():

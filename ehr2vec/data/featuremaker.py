@@ -21,6 +21,7 @@ class FeatureMaker:
         
 
     def __call__(self, concepts: pd.DataFrame, patients_info: pd.DataFrame) -> Tuple[dict, list]:
+        """Insert features into the concepts dataframe. Inplace operation."""
         for creator in self.pipeline:
             concepts = creator(concepts, patients_info)
             concepts['CONCEPT'] = concepts['CONCEPT'].astype(str)
