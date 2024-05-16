@@ -19,7 +19,7 @@ from ehr2vec.trainer.trainer import EHRTrainer
 
 CONFIG_NAME = 'finetune.yaml'
 N_SPLITS = 2  # You can change this to desired value
-BLOBSTORE='PHAIR'
+BLOBSTORE='CINF'
 DEAFAULT_VAL_SPLIT = 0.2
 
 args = get_args(CONFIG_NAME)

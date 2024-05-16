@@ -13,7 +13,7 @@ from ehr2vec.data.prepare_data import DatasetPreparer
 from ehr2vec.trainer.trainer import EHRTrainer
 
 CONFIG_NAME = 'pretrain.yaml'
-BLOBSTORE = 'PHAIR'
+BLOBSTORE = 'CINF'
 
 args = get_args(CONFIG_NAME)
 config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)

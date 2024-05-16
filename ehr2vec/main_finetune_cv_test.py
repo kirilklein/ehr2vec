@@ -17,7 +17,7 @@ from ehr2vec.evaluation.encodings import EHRTester
 from ehr2vec.evaluation.utils import save_data
 
 CONFIG_NAME = 'finetune_evaluate.yaml'
-BLOBSTORE='PHAIR'
+BLOBSTORE='CINF'
 
 args = get_args(CONFIG_NAME)
 config_path = join(dirname(abspath(__file__)), args.config_path)

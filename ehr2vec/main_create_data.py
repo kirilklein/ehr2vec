@@ -26,7 +26,7 @@ from ehr2vec.data_fixes.handle import Handler
 from tqdm import tqdm
 
 CONFIG_NAME = 'create_data.yaml'
-BLOBSTORE = 'PHAIR'
+BLOBSTORE = 'CINF'
 
 args = get_args(CONFIG_NAME, 'data_pretrain')
 config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)

@@ -19,7 +19,7 @@ from ehr2vec.evaluation.encodings import Forwarder
 from ehr2vec.evaluation.utils import validate_outcomes
 from ehr2vec.model.model import BertEHREncoder
 
-BLOBSTORE = 'PHAIR'
+BLOBSTORE = 'CINF'
 CONFIG_PATH = 'encode_censored.yaml'
 
 args = get_args(CONFIG_PATH, "encode_censored")

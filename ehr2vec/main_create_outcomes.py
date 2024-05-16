@@ -14,7 +14,7 @@ from ehr2vec.common.utils import check_patient_counts
 from ehr2vec.data.concept_loader import ConceptLoaderLarge
 from ehr2vec.downstream_tasks.outcomes import OutcomeMaker
 
-BLOBSTORE = 'PHAIR'
+BLOBSTORE = 'CINF'
 CONFIG_NAME = 'outcomes_test.yaml'
 
 args = get_args(CONFIG_NAME)

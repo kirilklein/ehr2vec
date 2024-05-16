@@ -30,7 +30,7 @@ if len(sys.argv) > 1:
     # Use the first argument as the config file name
     CONFIG_NAME = sys.argv[1]
 
-BLOBSTORE='PHAIR'
+BLOBSTORE='CINF'
 N_SPLITS = 2
 
 config_path = join(dirname(abspath(__file__)), CONFIG_NAME)
