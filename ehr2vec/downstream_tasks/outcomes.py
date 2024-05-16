@@ -167,7 +167,7 @@ class OutcomeHandler:
         data = self.assign_exposures_and_outcomes_to_data(data, index_dates, outcomes)
         return data
     
-    def check_input(outcomes, exposures):
+    def check_input(self, outcomes, exposures):
         """Check that outcomes and exposures have columns PID and TIMESTAMP."""
         if 'PID' not in outcomes.columns or 'TIMESTAMP' not in outcomes.columns:
             raise ValueError("Outcomes must have columns PID and TIMESTAMP.")
