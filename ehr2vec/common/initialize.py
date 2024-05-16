@@ -50,9 +50,7 @@ class Initializer:
             logger.info('Loading model from checkpoint')
             add_config = {**self.cfg.model}
             add_config.update({'pos_weight':get_pos_weight(self.cfg, train_dataset.outcomes),
-                            'embedding':Initializer.get_embedding(self.cfg),
                             'pool_type':self.cfg.model.get('pool_type', 'mean'),
-                            'prolonged_length_of_stay':False,
             })
             model = self.loader.load_model(
                 BertForFineTuning, 
@@ -62,22 +60,13 @@ class Initializer:
             model.to(self.device) 
             return model
         else:
-            raise NotImplementedError('Fine-tuning from scratch is not supported.')
+            raise NotImplementedError('Fine-tuning from scratch is not implemented.')
             logger.info('Initializing new model')
             return BertForFineTuning(
                 BertConfig(
                     **self.cfg.model,
                     pos_weight=get_pos_weight(self.cfg, train_dataset.outcomes),
-                    embedding='original_behrt' if self.cfg.model.get('behrt_embeddings', False) else None,
                     pool_type=self.cfg.model.get('pool_type', 'mean')),)
-    
-    @staticmethod
-    def get_embedding(cfg):
-        if cfg.model.get('behrt_embeddings', False):
-            return 'original_behrt'
-        elif cfg.model.get('discrete_abspos_embeddings', False):
-            return 'discrete_abspos'
-        return None
 
     def initialize_optimizer(self, model):
         """Initialize optimizer from checkpoint or from scratch."""
