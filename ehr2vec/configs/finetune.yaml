@@ -13,12 +13,11 @@ paths:
   #redefined_splits: outputs\pretraining\behrt_test\finetune_TEST_OUTCOME_censored_4_days_post_TEST_OUTCOME_test
   #exclude_pids: outputs\pretraining\behrt_test\finetune_TEST_OUTCOME_censored_4_days_post_TEST_OUTCOME_test\test_pids.pt
 model:
-  pool_type: "cls"
+  pool_type: "gru"
+  bidirectional: true
   #extend_head: 
   # hidden_size: null
-  cls:
-    _target_: ehr2vec.model.heads.ClassifierGRU
-    bidirectional: true
+
 data:
   num_patients: 300 #300
   val_split: 0.1
