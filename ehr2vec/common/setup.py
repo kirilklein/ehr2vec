@@ -143,7 +143,7 @@ class DirectoryPreparer:
         n_hours_censor = cfg.outcome.get('n_hours_censoring', None)
         n_hours_str = DirectoryPreparer.handle_n_hours(n_hours_censor) if n_hours_censor is not None else 'at'
         
-        if cfg.outcome.index_date:
+        if cfg.outcome.get('index_date', None) is not None:
             censor_name = DirectoryPreparer.handle_index_date(cfg.outcome.index_date)            
     
         finetune_folder_name = f"{finetune_folder_name}{n_hours_str}_{censor_name}"
