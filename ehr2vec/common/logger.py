@@ -20,3 +20,7 @@ def close_handlers():
     for handler in logging.root.handlers[:]:
         handler.close()
     logging.root.handlers = []
+
+def log_config(cfg, logger):
+    for key, value in cfg.items():
+        logger.info(f"{key}: {value}")

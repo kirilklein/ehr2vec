@@ -1,4 +1,6 @@
 import importlib
+from os.path import join
+import json
 import yaml
 
 
@@ -62,6 +64,16 @@ class Config(dict):
     def save_to_yaml(config, file_name):
         with open(file_name, 'w') as file:
             yaml.dump(config.to_dict(), file)
+    
+    def save_pretrained(self, folder:str):
+        """
+        Saves the config to a json file. 
+        For compatibility with trainer.
+        """
+        file_name = join(folder, 'model_config.json')
+        with open(file_name, 'w') as file:
+            json.dump(self.to_dict(), file)
+            
         
     def update(self, config: 'Config'):
         """Updates the config with a different config. Update only if key is not present in self."""

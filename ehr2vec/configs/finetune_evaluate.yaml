@@ -1,9 +1,9 @@
 env: local
 
 paths:
-  model_path: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_5_days_post_TEST_OUTCOME_test"
+  model_path: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_24_hours_pre_TEST_OUTCOME_followup_start_at_index_date_test"
+  data_dir: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_24_hours_pre_TEST_OUTCOME_followup_start_at_index_date_test" 
   run_name: "evaluate"
-
 metrics:
   accuracy:
     _target_: evaluation.metrics.Accuracy
@@ -19,6 +19,10 @@ metrics:
   pr_auc:
     _target_: evaluation.metrics.PR_AUC
 
+tester_args:
+  batch_size: 16
+
 data:
   min_len: 1
-  test_data_dir: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_5_days_post_TEST_OUTCOME_test" 
+  preprocess: True
+  
