@@ -80,12 +80,6 @@ class PatientFilter:
                 kept_indices.append(i)
         return self.select_entries(data, kept_indices)
     
-    def select_censored(self, data: Data) -> Data:
-        """Select only censored patients. This is only relevant for the fine-tuning  data. 
-        E.g. for pregnancy complications select only pregnant women."""
-        kept_indices = [i for i, censor in enumerate(data.index_dates) if pd.notna(censor)]
-        return self.select_entries(data, kept_indices)
-
     def exclude_short_sequences(self, data: Data) -> Data:
         """Exclude patients with less than k concepts"""
         excluder = Excluder(min_len = self.cfg.data.get('min_len', 3),
