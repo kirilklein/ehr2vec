@@ -2,7 +2,12 @@ from typing import List, Union
 
 import pandas as pd
 
+from ehr2vec.common.logger import TqdmToLogger
 from ehr2vec.common.utils import iter_patients
+from tqdm import tqdm
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Censorer:
@@ -15,11 +20,12 @@ class Censorer:
     def __call__(self, features: dict, index_dates: list) -> tuple:
         features = self.censor(features, index_dates)
         return features
-
     def censor(self, features: dict, index_dates: list) -> dict:
         """Censor the features based on the censor outcomes."""
         censored_features = {key: [] for key in features}
-        for i, patient in enumerate(iter_patients(features)):
+        censor_loop = tqdm(iter_patients(features), desc='Censoring', 
+            file=TqdmToLogger(logger), total=len(features["concept"]))
+        for i, patient in enumerate(censor_loop):
             index_timestamp = index_dates[i]
             censored_patient = self._censor_patient(patient, index_timestamp)
 
