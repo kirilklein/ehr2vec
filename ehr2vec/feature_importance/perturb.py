@@ -7,6 +7,7 @@ from ehr2vec.embeddings.ehr import PerturbedEHREmbeddings
 
 class PerturbationModel(torch.nn.Module):
     def __init__(self, bert_model:BertModel, cfg:Config):
+        """Lambda determines how much the """
         super().__init__()
         self.config = cfg
 
@@ -50,14 +51,21 @@ class PerturbationModel(torch.nn.Module):
         squared_diff = (logits - perturbed_logits)**2
         sigmas = self.noise_simulator.sigmas_embedding.weight
         concept_sigmas = sigmas[batch['concept']]
-        
         first_term = -torch.log(concept_sigmas).sum()
         second_term = self.regularization_term*squared_diff/(logits.std()+1e-6) # Add epsilon to avoid division by zero
         loss = first_term + second_term
         return loss.mean()
     
+    def log(self, logger):
+        log_string = "Perturbation model:\n"
+        log_string += f"\t Regularization term: {self.regularization_term}\n"
+        log_string += f"\tMin sigma: {self.noise_simulator.sigmas_embedding.weight.min()}\n"
+        log_string += f"\tMax sigma: {self.noise_simulator.sigmas_embedding.weight.max()}\n"
+        log_string += f"\tMean sigma: {self.noise_simulator.sigmas_embedding.weight.mean()}\n"
+        logger.info(log_string)
+        
     def save_sigmas(self, path:str)->None:
-        torch.save(self.noise_simulator.sigmas_embedding.weight, path)
+        torch.save(self.noise_simulator.sigmas_embedding.weight.flatten(), path)
 
 class GaussianNoise(torch.nn.Module):
     """Simulate Gaussian noise with trainable sigma to add to the embeddings"""

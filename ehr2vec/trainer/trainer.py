@@ -125,6 +125,9 @@ class EHRTrainer:
                 step_loss = 0
             if i%100==0:
                 self.run_log_gpu()
+        # check whether model has log method
+        if hasattr(self.model, 'log'):
+            self.model.log(logger=self.logger)
         self.validate_and_log(epoch, epoch_loss, train_loop)
         torch.cuda.empty_cache()
         del train_loop
