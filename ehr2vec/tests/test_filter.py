@@ -73,10 +73,6 @@ class TestPatientFilter(unittest.TestCase):
         result = self.filter.filter_outcome_before_censor(self.data)
         self.assertEqual(result.pids, ['pid1', 'pid3'])
 
-    def test_select_censored(self):
-        result = self.filter.select_censored(self.data)
-        self.assertEqual(result.pids, ['pid1', 'pid3'])
-
     def test_exclude_short_sequences(self):
         self.data.vocabulary = {f"code{i}": i for i in range(1, 9)}
         result = self.filter.exclude_short_sequences(self.data)

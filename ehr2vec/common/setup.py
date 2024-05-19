@@ -3,10 +3,12 @@ import logging
 import os
 import uuid
 from os.path import join, split
+from pathlib import Path
 from shutil import copyfile
 from typing import Tuple
 
-from ehr2vec.common.config import Config
+from ehr2vec.common.azure import AzurePathContext
+from ehr2vec.common.config import Config, load_config
 
 logger = logging.getLogger(__name__)  # Get the logger for this module
 
@@ -59,7 +61,60 @@ def copy_pretrain_config(cfg: Config, run_folder: str)->None:
         copyfile(pretrain_cfg_path, join(run_folder, pt_cfg_name))
     except:
         logger.warning(f"Could not copy pretrain config from {pretrain_cfg_path} to {run_folder}")
-        
+
+def update_test_cfg_with_pt_ft_cfgs(cfg:Config, finetune_folder:str)->Config:
+    """
+    Update config with pretrain and ft information.
+    Used for testing/feature importance calculation after finetuning.
+    """
+    finetune_config = load_config(join(finetune_folder, 'finetune_config.yaml'))
+    pretrain_config = load_config(join(finetune_folder, 'pretrain_config.yaml'))
+    if cfg.data.get('preprocess', False):
+        cfg.data.update(finetune_config.data)
+        cfg.outcome = finetune_config.outcome
+        cfg.data.update(pretrain_config.data)
+    cfg.model = finetune_config.model
+    cfg.paths.update(finetune_config.paths)
+    cfg.model.update(pretrain_config.model)
+    return cfg
+
+def remove_tmp_prefixes(path: str) -> Path:
+    """Remove 'tmp' prefixes from a path."""
+    path_parts = Path(path).parts
+    start_index = next((i for i, part in enumerate(path_parts) if not part.startswith('tmp')), 1)
+    return Path(*path_parts[start_index:])
+
+def remove_tmp_prefixes_from_path_cfg(path_cfg:Config)->Config:
+    """Update all paths in a cfg by removing 'tmp' prefixes."""
+    return {key: str(remove_tmp_prefixes(value)) for key, value in path_cfg.items() if 'tmp' in value}
+
+def fix_tmp_prefixes_for_azure_paths(cfg:Config, azure_context: AzurePathContext)->Config:
+    """
+    Fix paths in config for azure.
+    The saved finetune configs have /tmp/tmp.../actual/path
+    after removing it, we need to prepend the new mounted path
+    to every path in the config.
+    """
+    if cfg.env=='azure':
+        cfg.paths = remove_tmp_prefixes_from_path_cfg(cfg.paths) 
+        azure_context.cfg = cfg 
+        cfg, _, _ = azure_context.azure_finetune_setup() 
+    return cfg
+
+def initialize_configuration_finetune(config_path:str, dataset_name:str):
+    """
+    Load and adjust the configuration. Used if finetune models are loaded.
+    E.g. in test or feature importance scripts.
+    """
+    cfg = load_config(config_path)
+    azure_context = AzurePathContext(cfg, dataset_name=dataset_name)
+    cfg, run, mount_context = azure_context.azure_finetune_setup()
+    if cfg.env=='azure':
+        cfg.paths.output_path = 'outputs'
+    else:
+        cfg.paths.output_path = cfg.paths.model_path
+    return cfg, run, mount_context, azure_context
+
 
 class DirectoryPreparer:
     """Prepares directories for training and evaluation."""
@@ -146,7 +201,7 @@ class DirectoryPreparer:
         n_hours_censor = cfg.outcome.get('n_hours_censoring', None)
         n_hours_str = DirectoryPreparer.handle_n_hours(n_hours_censor) if n_hours_censor is not None else 'at'
         
-        if cfg.outcome.index_date:
+        if cfg.outcome.get('index_date', None) is not None:
             censor_name = DirectoryPreparer.handle_index_date(cfg.outcome.index_date)            
     
         finetune_folder_name = f"{finetune_folder_name}{n_hours_str}_{censor_name}"

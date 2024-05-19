@@ -107,13 +107,14 @@ class Data:
             features=deepcopy(self.features),
             pids=deepcopy(self.pids),
             outcomes=deepcopy(self.outcomes) if self.outcomes is not None else None,
-            censorings=deepcopy(self.censorings) if self.censorings is not None else None,
+            index_dates=deepcopy(self.index_dates) if self.index_dates is not None else None,
             vocabulary=deepcopy(self.vocabulary),
             mode=self.mode
         )
     @classmethod
     def load_from_directory(cls, data_dir:str, mode:str)->'Data':
         """Load data from data_dir."""
+        
         def load_tensor(filename, required=False):
             """Helper function to load a tensor if it exists, otherwise return None"""
             filepath = join(data_dir, filename)
@@ -123,12 +124,14 @@ class Data:
                 else:
                     return None
             return torch.load(filepath)
-        features = load_tensor(f'{mode}_features.pt', required=True)
-        pids = load_tensor(f'{mode}_pids.pt', required=True)
-        outcomes = load_tensor(f'{mode}_outcomes.pt')
-        censorings = load_tensor(f'{mode}_censorings.pt')
+        
+        prepend = f"{mode}_" if mode!='' else ''
+        features = load_tensor(f'{prepend}features.pt', required=True)
+        pids = load_tensor(f'{prepend}pids.pt', required=True)
+        outcomes = load_tensor(f'{prepend}outcomes.pt')
+        index_dates = load_tensor(f'{prepend}index_dates.pt')
         vocabulary = load_tensor('vocabulary.pt')
-        return cls(features, pids, outcomes, censorings, vocabulary, mode=mode)
+        return cls(features, pids, outcomes, index_dates, vocabulary=vocabulary, mode=mode)
     
     def check_lengths(self):
         """Check that all features have the same length"""

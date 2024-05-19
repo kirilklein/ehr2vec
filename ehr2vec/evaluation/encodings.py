@@ -246,8 +246,6 @@ class EHRTester:
             'save_every_k_steps': float('inf'),
             'collate_fn': collate_fn}
         self.args = {**default_args, **args}
-        if not (self.args['effective_batch_size'] % self.args['batch_size'] == 0):
-            raise ValueError('effective_batch_size must be a multiple of batch_size')
 
     def evaluate(self, epoch: int, mode='test')->tuple:
         """Returns the validation/test loss and metrics"""

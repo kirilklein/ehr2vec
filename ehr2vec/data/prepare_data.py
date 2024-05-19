@@ -286,7 +286,7 @@ class DataModifier:
 
     def censor_data(self, data: Data) -> Data:
         """Censors data n_hours after censor_outcome."""
-        n_hours = self.cfg.outcome.get('n_hours', 0) 
+        n_hours = self.cfg.outcome.n_hours_censoring 
         logger.info(f"Censoring data {n_hours} hours after index date.")
         censorer = Censorer(n_hours=n_hours, vocabulary=data.vocabulary)
         data.features = censorer(data.features, data.index_dates)

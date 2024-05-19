@@ -210,7 +210,7 @@ class OutcomeHandler:
         missing_pids = set(data_pids) - set(censoring_timestamps.index)
         random_abspos = np.random.choice(censoring_timestamps.values, size=len(missing_pids))
         new_entries = pd.Series(random_abspos, index=missing_pids)
-        censoring_timestamps = censoring_timestamps.append(new_entries)
+        censoring_timestamps = pd.concat([censoring_timestamps,new_entries])
         return censoring_timestamps
 
     def compute_abspos_for_index_date(self, pids: List)->pd.Series:

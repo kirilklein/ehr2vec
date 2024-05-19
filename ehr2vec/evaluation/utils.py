@@ -110,10 +110,12 @@ def inverse_sqrt(x):
     return 1/np.sqrt(x)
 
 def get_pos_weight(cfg, outcomes):
+    """Get the positive class weight for the loss function."""
+    if 'trainer_args' not in cfg:
+        return None
     if cfg.trainer_args.get('pos_weight', False):
         return sum(pd.isna(outcomes)) / sum(pd.notna(outcomes))
-    else:
-        return None
+    return None
     
 def evaluate_predictions(y_val:np.ndarray, pred_probas:np.ndarray, metrics:list, threshold:float=.5):
     results = {}
