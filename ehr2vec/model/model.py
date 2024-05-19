@@ -26,44 +26,48 @@ class BertEHREncoder(BertModel):
                 layer.intermediate.intermediate_act_fn = SwiGLU(config)
                 # layer.output.LayerNorm = RMSNorm(config.hidden_size, eps=config.layer_norm_eps) # We dont use RMSNorm (only speedup, no performance gain)
 
-    def forward(self, batch: dict):
-        present_keys = [k for k in ['age', 'abspos', 'position_ids', 'dosage', 'unit'] if k in batch]
-        position_ids = {key: batch.get(key) for key in  present_keys}
-        outputs = super().forward(
-            input_ids=batch['concept'],
-            attention_mask=batch.get('attention_mask', None),
-            token_type_ids=batch.get('segment', None),
-            position_ids=position_ids,
+    def forward(self, batch: dict=None, inputs_embeds: torch.tensor=None):
+        """
+        Forward pass for the model. Either batch or inputs_embeds must be provided.
+        Inputs_embeds is prioritized over batch.
+        """
+        if inputs_embeds is not None:
+            return super().forward(
+             inputs_embeds=inputs_embeds,
+            )
+        if batch is not None:
+            present_keys = [k for k in ['age', 'abspos', 'position_ids', 'dosage', 'unit'] if k in batch]
+            position_ids = {key: batch.get(key) for key in  present_keys}
+            return super().forward(
+                input_ids=batch['concept'],
+                attention_mask=batch.get('attention_mask', None),
+                token_type_ids=batch.get('segment', None),
+                position_ids=position_ids,    
         )
-        return outputs
+        else:
+            raise ValueError("Either batch or inputs_embeds must be provided.")
+            
 
 class BertEHRModel(BertEHREncoder):
     def __init__(self, config):
         super().__init__(config)
         self.loss_fct = nn.CrossEntropyLoss()
         self.cls = MLMHead(config)
-        self.forward = self.forward_mlm
             
-    def forward_mlm(self, batch: dict):
-        outputs = super().forward(batch)
-
+    def forward(self, batch: dict, inputs_embeds: torch.tensor=None):
+        outputs = super().forward(batch=batch, inputs_embeds=inputs_embeds)
         sequence_output = outputs[0]    # Last hidden state
         logits = self.cls(sequence_output, batch['attention_mask'])
         outputs.logits = logits
 
         if batch.get('target', None) is not None:
             outputs.loss = self.get_loss(logits, batch['target'])
-            outputs.mlm_loss = outputs.loss.detach().item()
 
         return outputs
 
     def get_loss(self, logits, labels):
         """Calculate loss for masked language model."""
         return self.loss_fct(logits.view(-1, self.config.vocab_size), labels.view(-1))
-
-    def get_classification_loss(self, logits, labels):
-        """Calculate loss for prolonged length of stay classification if applicable."""
-        return self.plos_fct(logits.view(-1), labels.view(-1))
 
 class BertForFineTuning(BertEHRModel):
     def __init__(self, config):

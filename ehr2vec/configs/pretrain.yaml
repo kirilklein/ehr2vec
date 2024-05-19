@@ -62,6 +62,6 @@ metrics:
   top10:
     _target_: evaluation.metrics.PrecisionAtK
     topk: 10
-  mlm_loss:
+  loss:
     _target_: evaluation.metrics.LossAccessor
-    loss_name: mlm_loss
+    loss_name: loss
