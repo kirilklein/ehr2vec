@@ -12,16 +12,16 @@ class Censorer:
         self.n_hours = n_hours
         self.vocabulary = vocabulary
 
-    def __call__(self, features: dict, censorings: list) -> tuple:
-        features = self.censor(features, censorings)
+    def __call__(self, features: dict, index_dates: list) -> tuple:
+        features = self.censor(features, index_dates)
         return features
 
-    def censor(self, features: dict, censorings: list) -> dict:
+    def censor(self, features: dict, index_dates: list) -> dict:
         """Censor the features based on the censor outcomes."""
         censored_features = {key: [] for key in features}
         for i, patient in enumerate(iter_patients(features)):
-            censor_timestamp = censorings[i]
-            censored_patient = self._censor_patient(patient, censor_timestamp)
+            index_timestamp = index_dates[i]
+            censored_patient = self._censor_patient(patient, index_timestamp)
 
             # Append to censored features
             for key, value in censored_patient.items():
@@ -29,9 +29,9 @@ class Censorer:
 
         return censored_features
 
-    def _censor_patient(self, patient: dict, event_timestamp: float) -> dict:
-        """Censor the patient's features based on the event timestamp."""
-        if not pd.isna(event_timestamp):
+    def _censor_patient(self, patient: dict, index_timestamp: float) -> dict:
+        """Censor the patient's features n_hours after index_timestamp (given in abspos)."""
+        if not pd.isna(index_timestamp):
             # Extract the attention mask and determine the number of non-masked items
             attention_mask = patient["attention_mask"]
             num_non_masked = attention_mask.count(1)
@@ -45,17 +45,17 @@ class Censorer:
             background_flags = self._identify_background(concepts, tokenized_flag)
             
             # Determine which items to censor based on the event timestamp and background flags
-            censor_flags = self._generate_censor_flags(absolute_positions, background_flags, event_timestamp)
+            censor_flags = self._generate_censor_flags(absolute_positions, background_flags, index_timestamp)
         
             for key, value in patient.items():
                 patient[key] = [item for index, item in enumerate(value) if censor_flags[index]]
                 
         return patient
     
-    def _generate_censor_flags(self, absolute_positions: List[float], background_flags: List[bool], event_timestamp: float) -> List[bool]:
-        """Generate flags indicating which items to censor."""
+    def _generate_censor_flags(self, absolute_positions: List[float], background_flags: List[bool], index_timestamp: float) -> List[bool]:
+        """Generate flags indicating which items to censor, based on index_timestamp and self.n_hours."""
         return [
-            position - event_timestamp - self.n_hours <= 0 or is_background
+            position - index_timestamp - self.n_hours <= 0 or is_background
             for position, is_background in zip(absolute_positions, background_flags)
         ]
 
