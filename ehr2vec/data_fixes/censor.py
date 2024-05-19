@@ -16,10 +16,18 @@ class Censorer:
         n_hours if positive, censor all items that occur n_hours after event."""
         self.n_hours = n_hours
         self.vocabulary = vocabulary
-
     def __call__(self, features: dict, index_dates: list) -> tuple:
+        sample_concepts = features["concept"][0]
+        self.background_length = self.compute_background_length(sample_concepts)
+        
         features = self.censor(features, index_dates)
         return features
+    
+    def compute_background_length(self, sample_concepts) -> List[bool]:
+        """Precompute background flags for the vocabulary."""
+        tokenized_flag = self._identify_if_tokenized(sample_concepts)
+        return sum(self._identify_background(sample_concepts, tokenized_flag))
+    
     def censor(self, features: dict, index_dates: list) -> dict:
         """Censor the features based on the censor outcomes."""
         censored_features = {key: [] for key in features}
@@ -32,7 +40,6 @@ class Censorer:
             # Append to censored features
             for key, value in censored_patient.items():
                 censored_features[key].append(value)
-
         return censored_features
 
     def _censor_patient(self, patient: dict, index_timestamp: float) -> dict:
@@ -42,27 +49,22 @@ class Censorer:
             attention_mask = patient["attention_mask"]
             num_non_masked = attention_mask.count(1)
 
-            # Extract absolute positions and concepts for non-masked items
+            # Extract absolute positions for non-masked items
             absolute_positions = patient["abspos"][:num_non_masked]
-            concepts = patient["concept"][:num_non_masked]
-
-            # Determine if the concepts are tokenized and if they are background
-            tokenized_flag = self._identify_if_tokenized(concepts)
-            background_flags = self._identify_background(concepts, tokenized_flag)
             
             # Determine which items to censor based on the event timestamp and background flags
-            censor_flags = self._generate_censor_flags(absolute_positions, background_flags, index_timestamp)
-        
+            censor_flags = self._generate_censor_flags(absolute_positions, index_timestamp)
+            censor_flags[:self.background_length] = [True]*self.background_length # keep background
             for key, value in patient.items():
                 patient[key] = [item for index, item in enumerate(value) if censor_flags[index]]
                 
         return patient
     
-    def _generate_censor_flags(self, absolute_positions: List[float], background_flags: List[bool], index_timestamp: float) -> List[bool]:
+    def _generate_censor_flags(self, absolute_positions: List[float], index_timestamp: float) -> List[bool]:
         """Generate flags indicating which items to censor, based on index_timestamp and self.n_hours."""
         return [
-            position - index_timestamp - self.n_hours <= 0 or is_background
-            for position, is_background in zip(absolute_positions, background_flags)
+            position - index_timestamp - self.n_hours <= 0 
+            for position in absolute_positions
         ]
 
     def _identify_background(self, concepts: List[Union[int, str]], tokenized_flag: bool) -> List[bool]:
@@ -73,7 +75,6 @@ class Censorer:
         if tokenized_flag:
             bg_values = set([v for k, v in self.vocabulary.items() if k.startswith('BG_')])
             flags = [concept in bg_values for concept in concepts]
-            first_background = flags.index(True)
         else:
             flags = [concept.startswith('BG_') for concept in concepts]
 
