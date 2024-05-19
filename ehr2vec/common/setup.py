@@ -134,10 +134,13 @@ class DirectoryPreparer:
 
     @staticmethod
     def construct_finetune_model_dir_name(cfg: Config)->str:
-        """Constructs the name of the finetune model directory. Based on the outcome type, the censor type, and the number of hours pre- or post- outcome."""
+        """
+        Constructs the name of the finetune model directory. 
+        Based on the outcome type, the censor type, and the number of hours pre- or post- outcome.
+        """
         outcome_name = DirectoryPreparer.get_event_name(cfg.paths.outcome)
-        censor_name = DirectoryPreparer.get_event_name(cfg.paths.censor) \
-            if cfg.paths.get('censor', False) else outcome_name
+        censor_name = DirectoryPreparer.get_event_name(cfg.paths.exposure) \
+            if cfg.paths.get('exposure', False) else outcome_name
         finetune_folder_name = f"finetune_{outcome_name}_censored_"
 
         n_hours_censor = cfg.outcome.get('n_hours_censoring', None)

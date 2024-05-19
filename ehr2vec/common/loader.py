@@ -95,9 +95,10 @@ class FeaturesLoader:
         """
         logger.info(f'Load outcomes from {self.path_cfg.outcome}')
         outcomes = pd.read_csv(self.path_cfg.outcome)
-        if not self.path_cfg.get("censor", False):
+        if not self.path_cfg.get("exposure", False):
+            logger.warning("No exposure file provided. Using outcomes as censoring timestamps.")
             return outcomes, outcomes.copy(deep=True)
-        logger.info(f'Load censoring_timestamps from {self.path_cfg.exposure}')        
+        logger.info(f'Load exposure timestamps from {self.path_cfg.exposure}')        
         exposures = pd.read_csv(self.path_cfg.exposure)
         return outcomes, exposures
     
