@@ -114,6 +114,7 @@ class Data:
     @classmethod
     def load_from_directory(cls, data_dir:str, mode:str)->'Data':
         """Load data from data_dir."""
+        
         def load_tensor(filename, required=False):
             """Helper function to load a tensor if it exists, otherwise return None"""
             filepath = join(data_dir, filename)
@@ -123,10 +124,12 @@ class Data:
                 else:
                     return None
             return torch.load(filepath)
-        features = load_tensor(f'{mode}_features.pt', required=True)
-        pids = load_tensor(f'{mode}_pids.pt', required=True)
-        outcomes = load_tensor(f'{mode}_outcomes.pt')
-        index_dates = load_tensor(f'{mode}_index_dates.pt')
+        
+        prepend = f"{mode}_" if mode!='' else ''
+        features = load_tensor(f'{prepend}features.pt', required=True)
+        pids = load_tensor(f'{prepend}pids.pt', required=True)
+        outcomes = load_tensor(f'{prepend}outcomes.pt')
+        index_dates = load_tensor(f'{prepend}index_dates.pt')
         vocabulary = load_tensor('vocabulary.pt')
         return cls(features, pids, outcomes, index_dates, vocabulary=vocabulary, mode=mode)
     
