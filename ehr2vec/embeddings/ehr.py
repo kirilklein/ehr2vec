@@ -71,7 +71,7 @@ class EhrEmbeddings(BaseEmbeddings):
         
     def forward(
         self,
-        input_ids: torch.LongTensor,                  # concepts
+        input_ids: torch.LongTensor = None,                  # concepts
         token_type_ids: torch.LongTensor = None,      # segments
         position_ids: Dict[str, torch.Tensor] = None, # age and abspos
         inputs_embeds: torch.Tensor = None,
@@ -79,6 +79,7 @@ class EhrEmbeddings(BaseEmbeddings):
     )->torch.Tensor:
         
         if inputs_embeds is None:
+            assert input_ids is not None, "input_ids is required if inputs_embeds is None"
             embeddings = self.a * self.concept_embeddings(input_ids)
             
             if token_type_ids is not None:
@@ -100,3 +101,43 @@ class EhrEmbeddings(BaseEmbeddings):
             return embeddings
         else:
             return inputs_embeds
+        
+class PerturbedEHREmbeddings(EhrEmbeddings):
+    def __init__(self, config):
+        super().__init__(config)
+        self.initialize_linear_params(config)
+
+    def forward(
+        self,
+        batch:Dict[str, torch.Tensor],
+        noise_simulator: nn.Module,
+        **kwargs
+    ):
+
+        concept_embeddings = self.concept_embeddings(batch['concept'])
+        
+        noise = noise_simulator.simulate_noise(batch['concept'], concept_embeddings)
+        concept_embeddings += noise
+
+        embeddings = self.a * concept_embeddings
+        if batch.get('segment', None) is not None:
+            segments_embedded = self.segment_embeddings(batch['segment'])
+            embeddings += self.b * segments_embedded
+
+        if batch.get('age', None) is not None:
+            ages_embedded = self.age_embeddings(batch['age'])
+            embeddings += self.c * ages_embedded
+            
+        embeddings = self.LayerNorm(embeddings)
+        embeddings = self.dropout(embeddings)
+
+        return embeddings
+
+    def set_parameters(self, ehr_embeddings):
+        """Sets the parameters of this instance to the parameters of the given EhrEmbeddings instance."""
+        self.load_state_dict(ehr_embeddings.state_dict())
+    
+    def freeze_embeddings(self):
+        """Freeze the embeddings."""
+        for param in self.parameters():
+            param.requires_grad = False

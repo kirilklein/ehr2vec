@@ -1,0 +1,20 @@
+env: local
+
+paths:
+  model_path: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_24_hours_pre_year2015_month1_day1_followup_start_at_index_date_test"
+  data_dir: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_24_hours_pre_year2015_month1_day1_followup_start_at_index_date_test" 
+  run_name: "perturb_fi"
+
+metrics:
+  roc_auc:
+    _target_: evaluation.metrics.ROC_AUC
+  pr_auc:
+    _target_: evaluation.metrics.PR_AUC
+
+trainer_args:
+  batch_size: 16
+
+data:
+  min_len: 1
+  preprocess: True
+  
