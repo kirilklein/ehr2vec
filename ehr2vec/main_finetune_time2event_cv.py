@@ -9,7 +9,7 @@ from ehr2vec.common.loader import load_and_select_splits
 from ehr2vec.common.setup import (DirectoryPreparer, copy_data_config,
                                   copy_pretrain_config, get_args)
 from ehr2vec.common.utils import Data, compute_number_of_warmup_steps
-from ehr2vec.data.dataset import BinaryOutcomeDataset
+from ehr2vec.data.dataset import Time2EventDataset
 from ehr2vec.data.prepare_data import DatasetPreparer
 from ehr2vec.data.split import get_n_splits_cv
 from ehr2vec.evaluation.utils import (
@@ -17,7 +17,7 @@ from ehr2vec.evaluation.utils import (
     split_into_test_data_and_train_val_indices)
 from ehr2vec.trainer.trainer import EHRTrainer
 
-CONFIG_NAME = 'finetune_survival.yaml'
+CONFIG_NAME = 'finetune_time2event.yaml'
 N_SPLITS = 2  # You can change this to desired value
 BLOBSTORE='CINF'
 DEAFAULT_VAL_SPLIT = 0.2
@@ -46,9 +46,11 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     dataset_preparer.saver.save_patient_nums(train_data, val_data, folder=fold_folder)
 
     logger.info('Initializing datasets')
-    train_dataset = BinaryOutcomeDataset(train_data.features, train_data.outcomes)
-    val_dataset = BinaryOutcomeDataset(val_data.features, val_data.outcomes)
-    test_dataset = BinaryOutcomeDataset(test_data.features, test_data.outcomes) if len(test_data) > 0 else None
+    print(train_data.times2event)
+    assert False
+    train_dataset = Time2EventDataset(train_data.features, train_data.outcomes, train_data.times2event)
+    val_dataset = Time2EventDataset(val_data.features, val_data.outcomes, val_data.times2event)
+    test_dataset = Time2EventDataset(test_data.features, test_data.outcomes, val_data.times2event) if len(test_data) > 0 else None
     modelmanager = ModelManager(cfg, fold)
     checkpoint = modelmanager.load_checkpoint() 
     modelmanager.load_model_config() 
@@ -142,7 +144,7 @@ def cv_loop_predefined_splits(data: Data, predefined_splits_dir: str, test_data:
 
 if __name__ == '__main__':
     cfg, run, mount_context, pretrain_model_path = Initializer.initialize_configuration_finetune(config_path, dataset_name=BLOBSTORE)
-
+    cfg.outcome.time2event = True
     logger, finetune_folder = DirectoryPreparer.setup_run_folder(cfg)
     
     copy_data_config(cfg, finetune_folder)

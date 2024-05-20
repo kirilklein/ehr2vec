@@ -92,7 +92,7 @@ class DatasetPreparer:
                 index_date=self.cfg.outcome.get('index_date', None),
                 select_patient_group=data_cfg.get("select_patient_group", None), # exposed/unexposed
                 drop_pids_w_outcome_pre_followup=self.cfg.outcome.get("first_time_outcomes_only", False),
-                survival=self.cfg.outcome.get('survival', False),
+                time2event=self.cfg.outcome.get('time2event', False),
                 end_of_time=self.cfg.outcome.get('end_of_time', None),
                 death_is_event=self.cfg.outcome.get('death_is_event', False),
             )
@@ -291,7 +291,7 @@ class DataModifier:
         """Censors data n_hours after censor_outcome."""
         n_hours = self.cfg.outcome.n_hours_censoring 
         logger.info(f"Censoring data {n_hours} hours after index date.")
-        censorer = Censorer(n_hours=n_hours, vocabulary=data.vocabulary, features=data.features)
+        censorer = Censorer(n_hours=n_hours, vocabulary=data.vocabulary)
         data.features = censorer(data.features, data.index_dates)
         return data
 
