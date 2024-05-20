@@ -135,6 +135,8 @@ class PatientFilter:
             data.outcomes = [data.outcomes[i] for i in indices]
         if data.index_dates is not None:
             data.index_dates = [data.index_dates[i] for i in indices]
+        if data.times2event is not None:
+            data.times2event = [data.times2event[i] for i in indices]
         return data
     
     @staticmethod

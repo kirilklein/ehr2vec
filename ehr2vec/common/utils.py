@@ -108,15 +108,7 @@ class Data:
     
     def copy(self) -> 'Data':
         """Create a copy of this Data object"""
-        return Data(
-            features=deepcopy(self.features),
-            pids=deepcopy(self.pids),
-            outcomes=deepcopy(self.outcomes) if self.outcomes is not None else None,
-            index_dates=deepcopy(self.index_dates) if self.index_dates is not None else None,
-            times2event=deepcopy(self.times2event) if self.times2event is not None else None,
-            vocabulary=deepcopy(self.vocabulary),
-            mode=self.mode
-        )
+        return Data(**{attr: deepcopy(value) if value is not None else None for attr, value in self.__dict__.items()})
     @classmethod
     def load_from_directory(cls, data_dir:str, mode:str)->'Data':
         """Load data from data_dir."""
@@ -136,8 +128,9 @@ class Data:
         pids = load_tensor(f'{prepend}pids.pt', required=True)
         outcomes = load_tensor(f'{prepend}outcomes.pt')
         index_dates = load_tensor(f'{prepend}index_dates.pt')
+        times2event = load_tensor(f'{prepend}times2event.pt')   
         vocabulary = load_tensor('vocabulary.pt')
-        return cls(features, pids, outcomes, index_dates, vocabulary=vocabulary, mode=mode)
+        return cls(features, pids, outcomes, index_dates, times2event=times2event, vocabulary=vocabulary, mode=mode)
     
     def check_lengths(self):
         """Check that all features have the same length"""
@@ -147,6 +140,8 @@ class Data:
             assert len(self.outcomes) == len(self.pids), "Length of outcomes does not match length of pids"
         if self.index_dates is not None:
             assert len(self.index_dates) == len(self.pids), "Length of censor outcomes does not match length of pids"
+        if self.times2event is not None:
+            assert len(self.times2event) == len(self.pids), "Length of times2event does not match length of pids"
 
     def split(self, val_split: float)->Tuple['Data', 'Data']:
         """Split data into train and validation. Returns two Data objects"""
@@ -161,6 +156,7 @@ class Data:
                         pids=[self.pids[i] for i in indices],
                         outcomes=[self.outcomes[i] for i in indices] if self.outcomes is not None else None,
                         index_dates=[self.index_dates[i] for i in indices] if self.index_dates is not None else None,
+                        times2event=[self.times2event[i] for i in indices] if self.times2event is not None else None,
                         vocabulary=self.vocabulary,
                         mode=mode)
     
