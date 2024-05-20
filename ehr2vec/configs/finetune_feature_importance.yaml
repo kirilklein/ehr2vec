@@ -1,7 +1,7 @@
 env: local
 
 paths:
-  model_path: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_24_hours_pre_TEST_OUTCOME_followup_start_at_index_date_test"
+  model_path: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_24_hours_pre_TEST_CENSOR_followup_start_at_index_date_test"
   # data_dir: "../outputs/pretraining/test/finetune_TEST_OUTCOME_censored_24_hours_pre_year2015_month1_day1_followup_start_at_index_date_test" 
   run_name: "perturb_fi"
 
@@ -34,6 +34,10 @@ trainer_args:
   checkpoint_frequency: 1
   early_stopping: 20
   stopping_criterion: roc_auc
+
+scheduler:
+  _target_: transformers.get_constant_schedule_with_warmup
+  num_warmup_epochs: 5
 
 optimizer:
   lr: 5e-3
