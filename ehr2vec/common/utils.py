@@ -206,3 +206,7 @@ class Data:
         """Add censor outcomes to data"""
         self.index_dates = self._outcome_helper(index_dates)
 
+    def add_times2event(self, times2event: Union[List, Dict]):
+        """Add time to event to data"""
+        self.times2event = self._outcome_helper(times2event)
+

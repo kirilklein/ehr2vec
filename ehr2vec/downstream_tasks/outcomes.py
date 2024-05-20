@@ -105,7 +105,7 @@ class OutcomeHandler:
                 select_patient_group: str=None,
                 drop_pids_w_outcome_pre_followup: bool=False,
                 n_hours_start_followup: int=0,
-                survival: bool=False,
+                time2event: bool=False,
                 end_of_time: dict=None,
                 death_is_event: bool=False
                  ):
@@ -122,13 +122,13 @@ class OutcomeHandler:
         self.select_patient_group = select_patient_group
         self.drop_pids_w_outcome_pre_followup = drop_pids_w_outcome_pre_followup
         self.n_hours_start_followup = n_hours_start_followup
-        self.survival = survival
+        self.time2event = time2event
         self.end_of_time = end_of_time
         self.death_is_event = death_is_event
         self.check_args()
     
     def check_args(self):
-        if self.survival:
+        if self.time2event:
             if not self.end_of_time:
                 raise ValueError("end_of_time must be provided if survival=True.")
 
@@ -181,7 +181,7 @@ class OutcomeHandler:
             data = data.exclude_pids(outcome_pre_followup_pids)
         # Step 8: Assign outcomes and censor outcomes to data
         data = self.assign_exposures_and_outcomes_to_data(data, index_dates, outcomes)
-        if self.survival:
+        if self.time2event:
             data = self.assign_time2event(data)
         return data
     
@@ -192,27 +192,48 @@ class OutcomeHandler:
         if 'PID' not in exposures.columns or 'TIMESTAMP' not in exposures.columns:
             raise ValueError("Exposures must have columns PID and TIMESTAMP.")
         
-    def assign_time2event(self, data: Data):
-        """Assign time to event to data"""
+    def assign_time2event(self, data: Data)->Data:
+        """
+        This function calculates the time to event
+        or censoring for each patient based on outcomes, deaths, and the end of data collection period.
+        """
         T = pd.Series(index=data.pids)
         outcomes = pd.Series(data.outcomes, index=data.pids)
         index_dates = pd.Series(data.index_dates, index=data.pids)
         deaths = self.get_death_abspos(data)
-        end_of_time = pd.Series(self.compute_end_of_time_abspos()*len(data.pids), index=data.pids)
+        
+        end_of_time = self.compute_end_of_time_abspos()[0]
+
         if self.death_is_event:
-            # take the minimum of the death and outcomes
-            outcomes = outcomes.combine(deaths, min)
+            outcomes = self.add_death_to_events(outcomes, deaths)
             data.outcomes = outcomes.to_list()
+        
         # Case when the specific outcome is known
         has_outcome = outcomes.notna()
         T[has_outcome] = outcomes[has_outcome] - index_dates[has_outcome]
-
-        # Case when the outcome is not known and either death occurs or end of time is reached
+        
+        # Cases with no outcome
         no_outcome = ~has_outcome
         death_before_end = no_outcome & deaths.notna() & (deaths < end_of_time)
         T[death_before_end] = deaths[death_before_end] - index_dates[death_before_end]
-        data.times2event = T.to_list()
+
+        # patients reaching end of time
+        end_of_time_mask = no_outcome & ~death_before_end
+        T[end_of_time_mask] = end_of_time - index_dates[end_of_time_mask]
+
+        # check that all time2event are notna
+        if T.isna().any():
+            raise ValueError("Some time2event are still missing.")
+        data.add_times2event(T.to_list())
         return data
+
+    @staticmethod
+    def add_death_to_events(outcomes:pd.Series, deaths:pd.Series)->pd.Series:
+        """Add death to outcomes and take whichever comes first."""
+        # Fill None in outcomes with corresponding deaths and vice-versa
+        filled_outcomes = outcomes.fillna(deaths)
+        filled_deaths = deaths.fillna(outcomes)
+        return filled_outcomes.combine(filled_deaths, min)
 
     def get_death_abspos(self, data: Data)->pd.Series:
         """Get the death abspos for each patient, if applicable."""
