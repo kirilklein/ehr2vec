@@ -91,13 +91,16 @@ class DatasetPreparer:
             outcomehandler = OutcomeHandler(
                 index_date=self.cfg.outcome.get('index_date', None),
                 select_patient_group=data_cfg.get("select_patient_group", None), # exposed/unexposed
-                drop_pids_w_outcome_pre_followup=self.cfg.outcome.get("first_time_outcomes_only", False))
+                drop_pids_w_outcome_pre_followup=self.cfg.outcome.get("first_time_outcomes_only", False),
+                survival=self.cfg.outcome.get('survival', False),
+                end_of_time=self.cfg.outcome.get('end_of_time', None),
+                death_is_event=self.cfg.outcome.get('death_is_event', False),
+            )
             data = outcomehandler.handle(
                 data,
                 outcome_dates, 
                 exposure_dates, 
                 )
-            
             # 4. Optional: Filter code types
             if data_cfg.get('code_types'):
                 data = self.utils.process_data(data, self.code_type_filter.filter)
@@ -288,7 +291,7 @@ class DataModifier:
         """Censors data n_hours after censor_outcome."""
         n_hours = self.cfg.outcome.n_hours_censoring 
         logger.info(f"Censoring data {n_hours} hours after index date.")
-        censorer = Censorer(n_hours=n_hours, vocabulary=data.vocabulary)
+        censorer = Censorer(n_hours=n_hours, vocabulary=data.vocabulary, features=data.features)
         data.features = censorer(data.features, data.index_dates)
         return data
 

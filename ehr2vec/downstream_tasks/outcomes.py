@@ -99,23 +99,39 @@ class OutcomeMaker:
         return col_bool
 class OutcomeHandler:
     ORIGIN_POINT = {'year': 2020, 'month': 1, 'day': 26, 'hour': 0, 'minute': 0, 'second': 0}
+    DEATH_CONCEPT = 'Death'
     def __init__(self, 
                 index_date: Dict[str, int]=None,
                 select_patient_group: str=None,
                 drop_pids_w_outcome_pre_followup: bool=False,
                 n_hours_start_followup: int=0,
+                survival: bool=False,
+                end_of_time: dict=None,
+                death_is_event: bool=False
                  ):
         """
         index_date (optional): use same censor date for all patients
         select_patient_group (optional): select only exposed or unexposed patients
         drop_pids_w_outcome_pre_followup (optional): remove patients with outcome before follow-up start
         n_hours_start_followup (optional): number of hours to start follow-up after exposure (looking for positive label)
+        survival: whether survival analysis data (T and E) should be returned.
+        end_of_time: dictionary with year, month, day, hour, minute, second for the end of data collection period.
+        death_is_event: count death as event in survival analysis
         """
         self.index_date = index_date
         self.select_patient_group = select_patient_group
         self.drop_pids_w_outcome_pre_followup = drop_pids_w_outcome_pre_followup
         self.n_hours_start_followup = n_hours_start_followup
+        self.survival = survival
+        self.end_of_time = end_of_time
+        self.death_is_event = death_is_event
+        self.check_args()
     
+    def check_args(self):
+        if self.survival:
+            if not self.end_of_time:
+                raise ValueError("end_of_time must be provided if survival=True.")
+
     def handle(
             self,
             data: Data,
@@ -165,6 +181,8 @@ class OutcomeHandler:
             data = data.exclude_pids(outcome_pre_followup_pids)
         # Step 8: Assign outcomes and censor outcomes to data
         data = self.assign_exposures_and_outcomes_to_data(data, index_dates, outcomes)
+        if self.survival:
+            data = self.assign_time2event(data)
         return data
     
     def check_input(self, outcomes, exposures):
@@ -174,6 +192,48 @@ class OutcomeHandler:
         if 'PID' not in exposures.columns or 'TIMESTAMP' not in exposures.columns:
             raise ValueError("Exposures must have columns PID and TIMESTAMP.")
         
+    def assign_time2event(self, data: Data):
+        """Assign time to event to data"""
+        T = pd.Series(index=data.pids)
+        outcomes = pd.Series(data.outcomes, index=data.pids)
+        index_dates = pd.Series(data.index_dates, index=data.pids)
+        deaths = self.get_death_abspos(data)
+        end_of_time = pd.Series(self.compute_end_of_time_abspos()*len(data.pids), index=data.pids)
+        if self.death_is_event:
+            # take the minimum of the death and outcomes
+            outcomes = outcomes.combine(deaths, min)
+            data.outcomes = outcomes.to_list()
+        # Case when the specific outcome is known
+        has_outcome = outcomes.notna()
+        T[has_outcome] = outcomes[has_outcome] - index_dates[has_outcome]
+
+        # Case when the outcome is not known and either death occurs or end of time is reached
+        no_outcome = ~has_outcome
+        death_before_end = no_outcome & deaths.notna() & (deaths < end_of_time)
+        T[death_before_end] = deaths[death_before_end] - index_dates[death_before_end]
+        data.times2event = T.to_list()
+        return data
+
+    def get_death_abspos(self, data: Data)->pd.Series:
+        """Get the death abspos for each patient, if applicable."""
+        death_token = data.vocabulary.get(self.DEATH_CONCEPT, None)
+        if death_token is None:
+            raise ValueError("Death token not found in vocabulary.")
+        death_abspos = []
+        for i, patient_concepts in enumerate(data.features['concept']):
+            if death_token in patient_concepts:
+                death_abspos.append(data.features['abspos'][i][patient_concepts.index(death_token)])
+            else:
+                death_abspos.append(None)
+        return pd.Series(death_abspos, index=data.pids)
+
+    def compute_end_of_time_abspos(self)->List[float]:
+        """Compute the end of time in hours since origin point based on the end_of_time attribute."""
+        end_of_time_timestamp = datetime(**self.end_of_time)
+        # difference to ORIGIN_POINT in hours
+        end_of_time = Utilities.get_abspos_from_origin_point([end_of_time_timestamp], self.ORIGIN_POINT)
+        return end_of_time
+
     @staticmethod
     def filter_outcomes_by_pids(outcomes: pd.DataFrame, data: Data, type_info:str='')->pd.DataFrame:
         """Filter outcomes to include only patients in the data."""

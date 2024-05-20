@@ -7,7 +7,7 @@ class TestCensorer(unittest.TestCase):
 
     def setUp(self):
         self.censorer = Censorer(n_hours=1)
-
+        self.censorer.background_length = 3
     def test_censor(self):
         features = {
             'concept': [['[CLS]', 'BG_GENDER_Male', '[SEP]', 'Diagnosis1', '[SEP]', 'Diagnosis2', 'Medication1', '[SEP]']],
@@ -38,9 +38,8 @@ class TestCensorer(unittest.TestCase):
 
     def test_generate_censor_flags(self):
         abspos = [0, 0, 0, 1, 1, 2, 3, 3]
-        background_flags = [False, True, False, False, False, False, False, False]
         event_timestamp = 1
-        censor_flags = self.censorer._generate_censor_flags(abspos, background_flags, event_timestamp)
+        censor_flags = self.censorer._generate_censor_flags(abspos, event_timestamp)
 
         self.assertEqual(censor_flags, [True, True, True, True, True, True, False, False])
 

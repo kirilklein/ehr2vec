@@ -91,10 +91,15 @@ def compute_number_of_warmup_steps(cfg: Config, num_patients:int)->None:
 
 @dataclass
 class Data:
+    """
+    Class to hold data for training and evaluation.
+    times2event: time to event for survival data (in abspos from index date until dropout or event)
+    """
     features: dict = field(default_factory=dict)
     pids: list = field(default_factory=list)
     outcomes: Optional[List] = field(default=None)
     index_dates: Optional[List] = field(default=None)
+    times2event: Optional[List] = field(default=None)
     vocabulary: Optional[Dict] = field(default=None)
     mode: Optional[str] = field(default=None)
     
@@ -108,6 +113,7 @@ class Data:
             pids=deepcopy(self.pids),
             outcomes=deepcopy(self.outcomes) if self.outcomes is not None else None,
             index_dates=deepcopy(self.index_dates) if self.index_dates is not None else None,
+            times2event=deepcopy(self.times2event) if self.times2event is not None else None,
             vocabulary=deepcopy(self.vocabulary),
             mode=self.mode
         )

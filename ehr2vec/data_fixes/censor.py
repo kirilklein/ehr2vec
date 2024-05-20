@@ -16,6 +16,8 @@ class Censorer:
         n_hours if positive, censor all items that occur n_hours after event."""
         self.n_hours = n_hours
         self.vocabulary = vocabulary
+        self.background_length = None
+        
     def __call__(self, features: dict, index_dates: list) -> tuple:
         sample_concepts = features["concept"][0]
         self.background_length = self.compute_background_length(sample_concepts)
@@ -30,6 +32,8 @@ class Censorer:
     
     def censor(self, features: dict, index_dates: list) -> dict:
         """Censor the features based on the censor outcomes."""
+        if not self.background_length:
+            raise ValueError("Background length is not computed. Please call compute_background_length first.")
         censored_features = {key: [] for key in features}
         censor_loop = tqdm(iter_patients(features), desc='Censoring', 
             file=TqdmToLogger(logger), total=len(features["concept"]))

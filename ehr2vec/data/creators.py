@@ -127,13 +127,14 @@ class DeathCreator(BaseCreator):
     appends this information to the concepts DataFrame.
     """
     id = 'death'
+    DEATH_CONCEPT = 'Death'
     def create(self, concepts: pd.DataFrame, patients_info: pd.DataFrame)-> pd.DataFrame:
         birthdate_col = self.find_column(patients_info, 'birth')
         deathdate_col = self.find_column(patients_info, 'death')
         logger.info(f'Creating death feature using birthdate column: {birthdate_col} and deathdate column: {deathdate_col}')
         
         death_info = {'PID': patients_info['PID'].tolist()}
-        death_info['CONCEPT'] = ['Death'] * len(patients_info)
+        death_info['CONCEPT'] = [self.DEATH_CONCEPT] * len(patients_info)
         death_info['SEGMENT'] = self._get_last_segments(concepts, patients_info)
         death_info['AGE'] = self._calculate_ages_at_death(patients_info, birthdate_col, deathdate_col)
         death_info['ABSPOS'] = Utilities.get_abspos_from_origin_point(patients_info[deathdate_col], self.config.abspos).to_list()
@@ -154,4 +155,5 @@ class DeathCreator(BaseCreator):
             raise ValueError("Make sure SEGMENT is created before DeathCreator is used.")
         last_segments = concepts.groupby('PID')['SEGMENT'].last().to_dict()
         return [last_segments[pid] for pid in patients_info['PID']] 
+    
 
