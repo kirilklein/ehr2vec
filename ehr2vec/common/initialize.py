@@ -15,7 +15,7 @@ from ehr2vec.common.setup import DirectoryPreparer
 from ehr2vec.common.utils import hook_fn
 from ehr2vec.data.utils import Utilities
 from ehr2vec.evaluation.utils import get_pos_weight, get_sampler
-from ehr2vec.model.model import BertEHRModel, BertForFineTuning
+from ehr2vec.model.model import BertEHRModel, BertForFineTuning, BertForTime2Event
 
 logger = logging.getLogger(__name__)  # Get the logger for this module
 CHECKPOINTS_DIR = "checkpoints"
@@ -52,8 +52,10 @@ class Initializer:
             add_config.update({'pos_weight':get_pos_weight(self.cfg, train_dataset.outcomes),
                             'pool_type':self.cfg.model.get('pool_type', 'mean'),
             })
+            model_class = BertForTime2Event if self.cfg.model.get('time2event', False) else BertForFineTuning
+            logger.info(f'Using {model_class.__name__} as model.')
             model = self.loader.load_model(
-                BertForFineTuning, 
+                model_class=model_class,
                 checkpoint=self.checkpoint, 
                 add_config=add_config,
                 )

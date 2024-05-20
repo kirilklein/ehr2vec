@@ -61,6 +61,22 @@ class BinaryOutcomeDataset(BaseEHRDataset):
         patient["target"] = float(pd.notna(self.outcomes[index]))
 
         return patient
+    
+class Time2EventDataset(BinaryOutcomeDataset):
+    """
+    outcomes: absolute position of outcome for each patient
+    time2event: time to event for each patient
+    """
+    def __init__(
+        self, features: dict, outcomes: list, time2event: list):
+        super().__init__(features, outcomes)
+        self.time2event = time2event
+
+    def __getitem__(self, index: int) -> dict:
+        """Add time2event to patient dict."""
+        patient = super().__getitem__(index)
+        patient["time2event"] = self.time2event[index]
+        return patient
 
 
 

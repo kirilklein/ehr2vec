@@ -46,11 +46,10 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     dataset_preparer.saver.save_patient_nums(train_data, val_data, folder=fold_folder)
 
     logger.info('Initializing datasets')
-    print(train_data.times2event)
-    assert False
     train_dataset = Time2EventDataset(train_data.features, train_data.outcomes, train_data.times2event)
     val_dataset = Time2EventDataset(val_data.features, val_data.outcomes, val_data.times2event)
-    test_dataset = Time2EventDataset(test_data.features, test_data.outcomes, val_data.times2event) if len(test_data) > 0 else None
+    test_dataset = Time2EventDataset(test_data.features, test_data.outcomes, test_data.times2event) if len(test_data) > 0 else None
+    cfg.model.time2event = True
     modelmanager = ModelManager(cfg, fold)
     checkpoint = modelmanager.load_checkpoint() 
     modelmanager.load_model_config() 
@@ -67,13 +66,13 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
         val_dataset=val_dataset, 
         test_dataset=None, # test only after training
         args=cfg.trainer_args,
-        metrics=cfg.metrics,
+        metrics=cfg.get('metrics', {}),
         sampler=sampler,
         scheduler=scheduler,
         cfg=cfg,
         run=run,
         logger=logger,
-        accumulate_logits=True,
+        accumulate_logits=False,
         run_folder=fold_folder,
         last_epoch=epoch
     )
@@ -87,7 +86,6 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     trainer.model = model
     trainer.test_dataset = test_dataset
     trainer._evaluate(checkpoint['epoch'], mode='test')
-
 
 
 def split_and_finetune(data: Data, train_indices: list, val_indices: list, fold: int, test_data: Data=None):

@@ -6,7 +6,7 @@ paths:
   outcome: "../outputs/features/outcomes/TEST_OUTCOME/TEST_OUTCOME.csv"
   exposure: "../outputs/features/outcomes/TEST_OUTCOME/TEST_CENSOR.csv"
   #output_path: "outputs/finetuning"
-  run_name: "test"
+  run_name: "time2event_test"
   #tokenized_dir:"tokenized"
   tokenized_file: "tokenized_finetune.pt" # can also be a list
   tokenized_pids: "pids_finetune.pt" # can also be a list
@@ -78,40 +78,12 @@ scheduler:
   num_warmup_steps: 10
   num_training_steps: 100
 
-metrics:
-  accuracy:
-    _target_: evaluation.metrics.Accuracy
-    threshold: 0.6
-  balanced_accuracy:
-    _target_: evaluation.metrics.Balanced_Accuracy
-  precision:
-    _target_: evaluation.metrics.Precision
-  recall:
-    _target_: evaluation.metrics.Recall
-  roc_auc:
-    _target_: evaluation.metrics.ROC_AUC
-  pr_auc:
-    _target_: evaluation.metrics.PR_AUC
-  dice:
-    _target_: evaluation.metrics.Dice
-  f1:
-    _target_: evaluation.metrics.F1
-  precentage_positives:
-    _target_: evaluation.metrics.Percentage_Positives
-  mean_probability:
-    _target_: evaluation.metrics.Mean_Probability
-  cohen_kappa:
-    _target_: evaluation.metrics.Cohen_Kappa
-  mathews_correlation:
-    _target_: evaluation.metrics.Matthews_Correlation_Coefficient
-  true_positives:
-    _target_: evaluation.metrics.True_Positives
-  true_negatives:
-    _target_: evaluation.metrics.True_Negatives
-  false_positives:
-    _target_: evaluation.metrics.False_Positives
-  false_negatives:
-    _target_: evaluation.metrics.False_Negatives
+#metrics:
+ # loss:
+  #  _target_: evaluation.metrics.LossAccessor
+   # loss_name: loss
+
+
   
   
  

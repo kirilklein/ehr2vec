@@ -8,7 +8,7 @@ from transformers.models.roformer.modeling_roformer import RoFormerEncoder
 from ehr2vec.embeddings.ehr import EhrEmbeddings
 from ehr2vec.model.activations import SwiGLU
 from ehr2vec.model.heads import FineTuneHead, MLMHead
-
+from ehr2vec.model.loss import neg_partial_log_likelihood
 
 logger = logging.getLogger(__name__)
 class BertEHREncoder(BertModel):
@@ -83,4 +83,25 @@ class BertForFineTuning(BertEHRModel):
         
     def get_loss(self, hidden_states, labels, labels_mask=None):    
         return self.loss_fct(hidden_states.view(-1), labels.view(-1))
+    
+class BertForTime2Event(BertEHREncoder):
+    def __init__(self, config):
+        super().__init__(config)
+        self.cls = FineTuneHead(config)
+        self.loss_fct = neg_partial_log_likelihood
+        logger.info(f"Using {self.cls.__class__.__name__} as model head")
+
+    def forward(self, batch: dict, inputs_embeds: torch.tensor=None):
+        outputs = super().forward(batch=batch, inputs_embeds=inputs_embeds)
+        sequence_output = outputs[0]    # Last hidden state
+        logits = self.cls(sequence_output, batch['attention_mask'])
+        outputs.logits = logits
+        if (batch.get('target', None) is not None) and (batch.get('time2event', None) is not None):
+            outputs.loss = self.get_loss(logits, batch['target'], batch['time2event'])
+
+        return outputs
+
+    def get_loss(self, hidden_states, labels, time2event):
+        return self.loss_fct(hidden_states.view(-1), labels.view(-1), time2event.view(-1))
+        
 
