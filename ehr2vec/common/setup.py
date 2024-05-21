@@ -86,7 +86,7 @@ def remove_tmp_prefixes(path: str) -> Path:
 
 def remove_tmp_prefixes_from_path_cfg(path_cfg:Config)->Config:
     """Update all paths in a cfg by removing 'tmp' prefixes."""
-    return {key: str(remove_tmp_prefixes(value)) for key, value in path_cfg.items() if 'tmp' in value}
+    return Config({key: str(remove_tmp_prefixes(value)) for key, value in path_cfg.items() if 'tmp' in value})
 
 def fix_tmp_prefixes_for_azure_paths(cfg:Config, azure_context: AzurePathContext)->Config:
     """

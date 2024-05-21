@@ -2,26 +2,29 @@
 Compute feature importance for 'concept' features using perturbation method.
 Using the five folds from the cross-validation.
 """
-from datetime import datetime
 import os
+from datetime import datetime
 from os.path import abspath, dirname, join, split
-from typing import Dict
+
 import torch
 
 from ehr2vec.common.azure import save_to_blobstore
 from ehr2vec.common.initialize import ModelManager
-from ehr2vec.common.logger import log_config
 from ehr2vec.common.loader import load_and_select_splits
-from ehr2vec.common.setup import (get_args, setup_logger,
-                                  update_test_cfg_with_pt_ft_cfgs, fix_tmp_prefixes_for_azure_paths,
-                                  initialize_configuration_finetune)
+from ehr2vec.common.logger import log_config
+from ehr2vec.common.saver import Saver
+from ehr2vec.common.setup import (fix_tmp_prefixes_for_azure_paths, get_args,
+                                  initialize_configuration_finetune,
+                                  setup_logger,
+                                  update_test_cfg_with_pt_ft_cfgs)
 from ehr2vec.common.utils import Data, compute_number_of_warmup_steps
 from ehr2vec.data.dataset import BinaryOutcomeDataset
-from ehr2vec.common.saver import Saver
 from ehr2vec.evaluation.utils import check_data_for_overlap
+from ehr2vec.evaluation.visualization import plot_most_important_features
 from ehr2vec.feature_importance.perturb import PerturbationModel
+from ehr2vec.feature_importance.perturb_utils import average_sigmas, log_most_important_features
 from ehr2vec.trainer.trainer import EHRTrainer
-import matplotlib.pyplot as plt
+
 
 CONFIG_NAME = 'finetune_feature_importance.yaml'
 BLOBSTORE='CINF'
@@ -51,7 +54,7 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     torch.save(val_data.pids, join(save_fold_folder, 'val_pids.pt'))
     if len(test_data) > 0:
         torch.save(test_data.pids, join(fold_folder, 'test_pids.pt'))
-    Saver(fi_folder).save_patient_nums(train_data, val_data, folder=fold_folder)
+    Saver(fi_folder).save_patient_nums(train_data, val_data)
 
     # initialize datasets
     logger.info('Initializing datasets')
@@ -68,10 +71,20 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     
     # initialize perturbation model
     perturbation_model = PerturbationModel(finetuned_model, cfg.model)
+    logger.info("Trainable parameters in the perturbation model")
+    for name, param in perturbation_model.named_parameters():
+        if param.requires_grad:
+            logger.info(f"{name}: {param.size()}")
     assert len(train_data.vocabulary)==perturbation_model.noise_simulator.sigmas_embedding.weight.shape[0], f"Vocabulary size {len(train_data.vocabulary)} does not match sigmas size {perturbation_model.noise_simulator.sigmas_embedding.weight.shape[0]}"
     modelmanager.model_path = None # to initialize training components form scratch
     optimizer, sampler, scheduler, cfg = modelmanager.initialize_training_components(
         perturbation_model, train_dataset)
+
+    logger.info("Optimizer parameters")
+    for group in optimizer.param_groups:
+        logger.info("Optimizer group:")
+        for param in group['params']:
+            logger.info(f"size {param.size()}")
 
     trainer = EHRTrainer( 
         model=perturbation_model, 
@@ -90,21 +103,13 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
         run_folder=save_fold_folder,
     )
     trainer.train()
-    trainer.test_dataset = test_dataset
-    trainer._evaluate(checkpoint['epoch'], mode='test')
+    if test_dataset is not None:
+        trainer.test_dataset = test_dataset
+        trainer._evaluate(checkpoint['epoch'], mode='test')
     # save sigmas from the model
     perturbation_model.save_sigmas(join(fi_folder, f'sigmas_fold_{fold}.pt'))
     log_most_important_features(perturbation_model, train_data.vocabulary)
 
-def log_most_important_features(perturbation_model, vocabulary):
-    sigmas = perturbation_model.noise_simulator.sigmas_embedding.weight.flatten().cpu().detach().numpy()
-    feature_importance = 1/(sigmas+1e-9)
-    inv_vocab = {v: k for k, v in vocabulary.items()}
-    feature_importance_dic = {inv_vocab[i]: importance for i, importance in enumerate(feature_importance)}
-    sorted_features = sorted(feature_importance_dic.items(), key=lambda x: x[1], reverse=True)
-    sorted_features = sorted_features[:10]
-    logger.info("Biggest Feature Importances")
-    logger.info(sorted_features)
 
 def _limit_patients(indices_or_pids: list, split: str)->list:
     if f'number_of_{split}_patients' in cfg.data:
@@ -153,6 +158,7 @@ def cv_loop_predefined_splits(
 def prepare_and_load_data():
     cfg, run, mount_context, azure_context = initialize_configuration_finetune(config_path, dataset_name=BLOBSTORE)
     date = datetime.now().strftime("%Y%m%d-%H%M")
+    
     fi_folder = join(cfg.paths.output_path, f'feature_importance_perturb_{date}')
     os.makedirs(fi_folder, exist_ok=True)
 
@@ -163,7 +169,7 @@ def prepare_and_load_data():
     cfg = update_test_cfg_with_pt_ft_cfgs(cfg, finetune_folder)
     cfg = fix_tmp_prefixes_for_azure_paths(cfg, azure_context)
     
-    cfg.save_to_yaml(join(finetune_folder, 'feature_importance_config.yaml'))
+    cfg.save_to_yaml(join(fi_folder, 'feature_importance_config.yaml'))
    
     log_config(cfg, logger)
     cfg.paths.run_name = split(fi_folder)[-1]
@@ -177,35 +183,14 @@ def prepare_and_load_data():
         #data = dataset_preparer.prepare_finetune_data() 
     return data, mount_context, cfg, run, logger, fi_folder
 
-def average_sigmas(fi_folder:str, n_splits:int)->torch.Tensor:
-    """Average sigmas from all folds. Save to sigmas_average.pt"""
-    sigmas = []
-    for fold in range(1, n_splits+1):
-        sigmas_tensor = torch.load(join(fi_folder, f'sigmas_fold_{fold}.pt'))
-        sigmas.append(sigmas_tensor)
-    sigmas = torch.stack(sigmas).mean(dim=0)
-    torch.save(sigmas, join(fi_folder, 'sigmas_average.pt'))
-    return sigmas
-
-def plot_most_important_features(vocabulary: Dict[str, int], sigmas:torch.Tensor, folder:str, n_feats=20)->None:
-    """Save feature importance plot"""
-    inv_vocab = {v: k for k, v in vocabulary.items()}
-    sigmas = sigmas.cpu().detach().numpy()
-    feature_importance = 1/(sigmas+1e-9)
-    # use indices to map back to vocabulary
-    feature_importance_dic = {inv_vocab[i]: importance for i, importance in enumerate(feature_importance)}
-    _, ax = plt.subplots(figsize=(10, 10))
-    sorted_features = sorted(feature_importance_dic.items(), key=lambda x: x[1], reverse=True)
-    sorted_features = sorted_features[:n_feats]
-    features, importances = zip(*sorted_features)
-    ax.barh(features, importances)
-    ax.set_xlabel('Feature Importance')
-    ax.set_title('Perturbation-based Feature Importance')
-    plt.savefig(join(folder, 'feature_importance.png'))
 
 if __name__ == '__main__':
     data, mount_context, cfg, run, logger, fi_folder = prepare_and_load_data()
-    test_data = Data.load_from_directory(cfg.paths.model_path, mode='test')
+    if 'test_features.pt' in os.listdir(cfg.paths.model_path):
+        test_data = Data.load_from_directory(cfg.paths.model_path, mode='test')
+    else:
+        test_data = Data()
+        
     n_splits = cv_loop_predefined_splits(data, 
                             predefined_splits_dir=cfg.paths.model_path, 
                             finetune_folder=cfg.paths.model_path,
@@ -213,6 +198,7 @@ if __name__ == '__main__':
                             run=run,
                             test_data=test_data)
     sigmas = average_sigmas(fi_folder, n_splits)
+    torch.save(sigmas, join(fi_folder, 'sigmas_average.pt')) # save averaged sigmas
     plot_most_important_features(data.vocabulary, sigmas, fi_folder)
     if cfg.env=='azure':
         save_to_blobstore(local_path='', # uses everything in 'outputs' 

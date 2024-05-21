@@ -1,5 +1,10 @@
+from os.path import join
+from typing import Dict
+
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from sklearn.manifold import TSNE
 
 from ehr2vec.common.config import instantiate
@@ -37,3 +42,19 @@ def define_custom_sequential_colormap(color_start:str = "#FFFFFF", color_end:str
     vals[:, 2] = np.linspace(rgb_start[2], rgb_end[2], N)
     cmap = mcolors.ListedColormap(vals)
     return cmap
+
+def plot_most_important_features(vocabulary: Dict[str, int], sigmas:torch.Tensor, folder:str, n_feats=20)->None:
+    """Save feature importance plot"""
+    inv_vocab = {v: k for k, v in vocabulary.items()}
+    sigmas = sigmas.cpu().detach().numpy()
+    feature_importance = 1/(sigmas+1e-9)
+    # use indices to map back to vocabulary
+    feature_importance_dic = {inv_vocab[i]: importance for i, importance in enumerate(feature_importance)}
+    _, ax = plt.subplots(figsize=(10, 10))
+    sorted_features = sorted(feature_importance_dic.items(), key=lambda x: x[1], reverse=True)
+    sorted_features = sorted_features[:n_feats]
+    features, importances = zip(*sorted_features)
+    ax.barh(features, importances)
+    ax.set_xlabel('Feature Importance')
+    ax.set_title('Perturbation-based Feature Importance')
+    plt.savefig(join(folder, 'feature_importance.png'))

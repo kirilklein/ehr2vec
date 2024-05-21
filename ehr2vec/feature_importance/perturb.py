@@ -49,10 +49,12 @@ class PerturbationModel(torch.nn.Module):
         logits = original_output.logits
         perturbed_logits = perturbed_output.logits
         squared_diff = (logits - perturbed_logits)**2
+
         sigmas = self.noise_simulator.sigmas_embedding.weight
         concept_sigmas = sigmas[batch['concept']]
-        first_term = -torch.log(concept_sigmas).sum()
-        second_term = self.regularization_term*squared_diff/(logits.std()+1e-6) # Add epsilon to avoid division by zero
+        first_term = -torch.log(concept_sigmas+1e-6).sum()
+        
+        second_term = (self.regularization_term*squared_diff/(logits.std()+1e-6)) # Add epsilon to avoid division by zero
         loss = first_term + second_term
         return loss.mean()
     
@@ -84,7 +86,7 @@ class GaussianNoise(torch.nn.Module):
     def simulate_noise(self, concepts, embeddings: torch.Tensor)->torch.Tensor:
         """Simulate Gaussian noise using the sigmas"""
         concept_sigmas = self.sigmas_embedding(concepts).squeeze(-1)
-        std_normal_noise = torch.randn_like(embeddings)
+        std_normal_noise = torch.randn_like(embeddings, device=embeddings.device)
         scaled_noise = std_normal_noise * concept_sigmas.unsqueeze(-1)
         return scaled_noise
 
