@@ -72,16 +72,17 @@ class Initializer:
 
     def initialize_optimizer(self, model):
         """Initialize optimizer from checkpoint or from scratch."""
+        parameters_to_optimize = [p for p in model.parameters() if p.requires_grad]
         if self.checkpoint:
             logger.info('Loading AdamW optimizer from checkpoint')
-            optimizer = AdamW(model.parameters(),)
+            optimizer = AdamW(parameters_to_optimize)
             self.optimizer_state_dic_to_device(self.checkpoint['optimizer_state_dict'])
             optimizer.load_state_dict(self.checkpoint['optimizer_state_dict'])
             return optimizer
         else:
             logger.info('Initializing new AdamW optimizer')
             return AdamW(
-                model.parameters(),
+                parameters_to_optimize,
                 **self.cfg.optimizer
             )
 
