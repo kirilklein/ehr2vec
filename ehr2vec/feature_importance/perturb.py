@@ -54,9 +54,9 @@ class PerturbationModel(torch.nn.Module):
         concept_sigmas = sigmas[batch['concept']]
         first_term = -torch.log(concept_sigmas+1e-6).sum()
         
-        second_term = (self.regularization_term*squared_diff/(logits.std()+1e-6)) # Add epsilon to avoid division by zero
+        second_term = (self.regularization_term*squared_diff/(logits.std()+1e-6)).mean() # Add epsilon to avoid division by zero
         loss = first_term + second_term
-        return loss.mean()
+        return loss
     
     def log(self, logger):
         log_string = "Perturbation model:\n"
