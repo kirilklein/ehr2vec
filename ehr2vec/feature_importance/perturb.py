@@ -1,9 +1,10 @@
 import torch
-
+import logging
 from ehr2vec.model.model import BertEHRModel
 from ehr2vec.common.config import Config
 from ehr2vec.embeddings.ehr import PerturbedEHREmbeddings
 
+logger = logging.getLogger(__name__)
 
 class PerturbationModel(torch.nn.Module):
     def __init__(self, bert_model:BertEHRModel, cfg:Config, concept_frequency=None):
@@ -18,6 +19,7 @@ class PerturbationModel(torch.nn.Module):
         self.lambda_ = self.config.get('lambda', .01)
         self.K = bert_model.config.hidden_size
         regularization_term = 1/(self.K*self.lambda_)
+        logger.info(f"Regularization term: {regularization_term}")
         self.register_buffer('regularization_term', torch.tensor(regularization_term))
         
         inverse_frequency = self.set_inverse_frequency(concept_frequency)
@@ -75,12 +77,11 @@ class PerturbationModel(torch.nn.Module):
         return first_term + second_term
 
     def log(self, logger):
-        log_string = "Perturbation model:\n"
+        log_string = "Sigmas:\n"
         sigmas = self.get_sigmas_weights()
-        log_string += f"\t Regularization term: {self.regularization_term}\n"
-        log_string += f"\tMin sigma: {round(sigmas.min(),2)}\n"
-        log_string += f"\tMax sigma: {round(sigmas.max(),2)}\n"
-        log_string += f"\tMean sigma: {round(sigmas.mean(),2)}\n"
+        log_string += f"Min: {round(sigmas.min().item(), 3)}, "
+        log_string += f"Max: {round(sigmas.max().item(), 3)}, "
+        log_string += f"Mean: {round(sigmas.mean().item(), 3)}"
         logger.info(log_string)
         
     def save_sigmas(self, path:str)->None:

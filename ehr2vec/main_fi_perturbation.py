@@ -186,11 +186,11 @@ def prepare_and_load_data():
         raise ValueError("Not implemented yet. Just use preprocessed data.")
         #dataset_preparer = DatasetPreparer(cfg)
         #data = dataset_preparer.prepare_finetune_data() 
-    return data, mount_context, cfg, run, logger, fi_folder
+    return data, mount_context, cfg, run, logger, fi_folder, azure_context
 
 
 if __name__ == '__main__':
-    data, mount_context, cfg, run, logger, fi_folder = prepare_and_load_data()
+    data, mount_context, cfg, run, logger, fi_folder, azure_context = prepare_and_load_data()
     if 'test_features.pt' in os.listdir(cfg.paths.model_path):
         test_data = Data.load_from_directory(cfg.paths.model_path, mode='test')
     else:
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     plot_most_important_features(data.vocabulary, sigmas, fi_folder)
     if cfg.env=='azure':
         save_to_blobstore(local_path='', # uses everything in 'outputs' 
-                          remote_path=join(BLOBSTORE, fix_tmp_prefixes_for_azure_paths(cfg.paths.model_path)))
+                          remote_path=join(BLOBSTORE, fix_tmp_prefixes_for_azure_paths(cfg.paths.model_path, azure_context=azure_context)))
         mount_context.stop()
 
     logger.info('Done')
