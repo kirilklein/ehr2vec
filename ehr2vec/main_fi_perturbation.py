@@ -22,7 +22,7 @@ from ehr2vec.data.dataset import BinaryOutcomeDataset
 from ehr2vec.evaluation.utils import check_data_for_overlap
 from ehr2vec.evaluation.visualization import plot_most_important_features
 from ehr2vec.feature_importance.perturb import PerturbationModel
-from ehr2vec.feature_importance.perturb_utils import average_sigmas, log_most_important_features
+from ehr2vec.feature_importance.perturb_utils import average_sigmas, log_most_important_features, compute_concept_frequency
 from ehr2vec.trainer.trainer import EHRTrainer
 
 
@@ -69,14 +69,19 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     logger.info('Load best finetuned model to compute test scores')
     finetuned_model = modelmanager.initialize_finetune_model(checkpoint, train_dataset)
     
+    if cfg.model.get('scale_with_frequency', False):
+        concept_frequency = compute_concept_frequency(train_data.features, train_data.vocabulary) 
+    else:
+        concept_frequency = None
     # initialize perturbation model
-    perturbation_model = PerturbationModel(finetuned_model, cfg.model)
+    perturbation_model = PerturbationModel(finetuned_model, cfg.model, concept_frequency)
     logger.info("Trainable parameters in the perturbation model")
     for name, param in perturbation_model.named_parameters():
         if param.requires_grad:
             logger.info(f"{name}: {param.size()}")
     assert len(train_data.vocabulary)==perturbation_model.noise_simulator.sigmas_embedding.weight.shape[0], f"Vocabulary size {len(train_data.vocabulary)} does not match sigmas size {perturbation_model.noise_simulator.sigmas_embedding.weight.shape[0]}"
     modelmanager.model_path = None # to initialize training components form scratch
+    
     optimizer, sampler, scheduler, cfg = modelmanager.initialize_training_components(
         perturbation_model, train_dataset)
 
