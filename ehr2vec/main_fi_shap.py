@@ -1,27 +1,30 @@
+"""
+Compute feature importance for 'concept' features using perturbation method.
+Using the five folds from the cross-validation.
+"""
 import os
+from datetime import datetime
 from os.path import abspath, dirname, join, split
 
-import torch
-from ehr2vec.dataloader.collate_fn import dynamic_padding
-from ehr2vec.common.azure import save_to_blobstore
-from ehr2vec.common.initialize import Initializer, ModelManager
-from ehr2vec.common.loader import load_and_select_splits
-from ehr2vec.common.setup import (DirectoryPreparer, copy_data_config,
-                                  copy_pretrain_config, get_args)
-from ehr2vec.common.utils import Data, compute_number_of_warmup_steps
-from ehr2vec.data.dataset import BinaryOutcomeDataset
-from ehr2vec.data.prepare_data import DatasetPreparer
-from ehr2vec.data.split import get_n_splits_cv
-from ehr2vec.evaluation.utils import (
-    check_data_for_overlap, compute_and_save_scores_mean_std, save_data,
-    split_into_test_data_and_train_val_indices)
-from torch.utils.data import DataLoader
-import transformers
+import numpy as np
 import shap
+import torch
+from torch.utils.data import DataLoader
 
-CONFIG_NAME = 'finetune.yaml'
-N_SPLITS = 2  # You can change this to desired value
-BLOBSTORE='PHAIR'
+from ehr2vec.common.azure import save_to_blobstore
+from ehr2vec.common.initialize import ModelManager
+from ehr2vec.common.logger import log_config
+from ehr2vec.common.setup import (fix_tmp_prefixes_for_azure_paths, get_args,
+                                  initialize_configuration_finetune,
+                                  setup_logger,
+                                  update_test_cfg_with_pt_ft_cfgs)
+from ehr2vec.common.utils import Data
+from ehr2vec.data.dataset import BinaryOutcomeDataset
+from ehr2vec.dataloader.collate_fn import dynamic_padding
+from ehr2vec.feature_importance.shap import BEHRTWrapper, EHRMasker
+
+CONFIG_NAME = 'shap_feature_importance.yaml'
+BLOBSTORE='CINF'
 DEAFAULT_VAL_SPLIT = 0.2
 
 args = get_args(CONFIG_NAME)
@@ -30,106 +33,60 @@ config_path = join(dirname(abspath(__file__)), args.config_path)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def finetune_fold(cfg, train_data:Data, val_data:Data, 
-                fold:int, test_data: Data=None)->None:
-    """Finetune model on one fold"""
-    if 'scheduler' in cfg:
-        logger.info('Computing number of warmup steps')
-        compute_number_of_warmup_steps(cfg, len(train_data))
+def compute_fold(
+        all_shap_values: np.ndarray, 
+        cfg, data:Data, fold:int, finetune_folder:str, fi_folder:str,
+        logger)->np.ndarray:
+    """Compute feature importance on one fold"""
     fold_folder = join(finetune_folder, f'fold_{fold}')
-    os.makedirs(fold_folder, exist_ok=True)
-    os.makedirs(join(fold_folder, "checkpoints"), exist_ok=True)
+    save_fold_folder = join(fi_folder, f'fold_{fold}')
 
-    logger.info("Saving patient numbers")
-    logger.info("Saving pids")
-    torch.save(train_data.pids, join(fold_folder, 'train_pids.pt'))
-    torch.save(val_data.pids, join(fold_folder, 'val_pids.pt'))
-    if len(test_data) > 0:
-        torch.save(test_data.pids, join(fold_folder, 'test_pids.pt'))
-    dataset_preparer.saver.save_patient_nums(train_data, val_data, folder=fold_folder)
+    os.makedirs(save_fold_folder, exist_ok=True)
 
+    # initialize datasets
     logger.info('Initializing datasets')
-    train_dataset = BinaryOutcomeDataset(train_data.features, train_data.outcomes)
-    val_dataset = BinaryOutcomeDataset(val_data.features, val_data.outcomes)
-    test_dataset = BinaryOutcomeDataset(test_data.features, test_data.outcomes) if len(test_data) > 0 else None
-    modelmanager = ModelManager(cfg, fold)
-    checkpoint = modelmanager.load_checkpoint() 
-    modelmanager.load_model_config() 
-
-    model = modelmanager.initialize_finetune_model(checkpoint, train_dataset)
-    dataloader = get_dataloader(cfg, val_dataset)
-
-    tokenizer = Tokenizer(vocabulary)
+    dataset = BinaryOutcomeDataset(data.features, data.outcomes)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, ) # SHAP will create n_permutations copies of the input
     
-    for i, patient in enumerate(dataloader):
-        if i > 1:
-            break
-        patient['concept'] = [[inv_vocabulary[c.item()] for c in patient['concept'][0]]]
-        print(patient['concept'])
-        wrapped_model = ModelWrapper(model, patient) 
-        pred = transformers.pipeline(
-            "text-classification",
-            model=wrapped_model,
-            tokenizer=tokenizer,
-            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-            return_all_scores=True,
-        )
-
-        explainer = shap.Explainer(pred)
-        #print('patient concept shape', patient['concept'].shape)
-        #print('patient',patient)
-        #patient = {key: value.int().to(device) for key, value in patient.items()}
-        #flatten_batch = flatten_inputs(patient)
-        #print('flatten shape', flatten_batch.shape)
-        #pooled_output = wrapped_model(flatten_batch)
-        
-        #print('pooled_output', pooled_output)
-        #assert False
-        #print(flatten_batch.shape)
-        # Create a DeepExplainer for your model
-        #explainer = shap.DeepExplainer(wrapped_model, flatten_batch)
-        #with torch.no_grad():
-         #   shap_values = explainer.shap_values(flatten_batch)
-          #  print(shap_values[0])
-        
-class Tokenizer():
-    def __init__(self, vocabulary):
-        self.vocabulary = vocabulary
-    def __call__(self, concepts):
-        return [[self.vocabulary.get(c, self.vocabulary['[UNK]']) for c in c_list] for c_list in concepts[0]]
-
-class ModelWrapper(torch.nn.Module):
-        def __init__(self, model, batch):
-            super(ModelWrapper, self).__init__()
-            self.model = model
-            self.batch = batch
-            self.config = model.config
-
-        def forward(self, tokenized_concepts):
-            """Forward pass of the model. Expect a flattened tensor which is reconstruced here to the original shape."""
-            #assert False
-            self.model.eval()
-            self.batch['concept'] = tokenized_concepts
-            with torch.no_grad():
-                outputs = self.model(self.batch)
-            return outputs.pooler_output
-
-def get_dataloader(cfg, dataset):
-    return DataLoader(
-        dataset, 
-        batch_size=1, 
-        shuffle=False, 
-        collate_fn=dynamic_padding
-        )
-
-
-
-# we need to use the embeddings as input!
-def split_and_finetune(data: Data, train_indices: list, val_indices: list, fold: int, test_data: Data=None):
-    train_data = data.select_data_subset_by_indices(train_indices, mode='train')
-    val_data = data.select_data_subset_by_indices(val_indices, mode='val')
-    check_data_for_overlap(train_data, val_data, test_data)
-    finetune_fold(cfg, train_data, val_data, fold, test_data)
+    # load BEHRT model
+    modelmanager = ModelManager(cfg, model_path=fold_folder)
+    checkpoint = modelmanager.load_checkpoint()
+    modelmanager.load_model_config() 
+    logger.info('Load best finetuned model to compute feature importance')
+    finetuned_model = modelmanager.initialize_finetune_model(checkpoint, data)
+    masker = EHRMasker(data.vocabulary)
+    finetuned_model.eval()
+    # to be able to handle the input, we pass 1 sample at a time
+    # the explainer creates n_permutation copies of it, 
+    # which we then pass as a batch to the modelwrapper
+    with torch.no_grad():
+        for i, batch in enumerate(dataloader):
+            shap_batch_size = cfg.shap.get('batch_size', 16)
+            wrapped_model = BEHRTWrapper(finetuned_model, batch)
+            concepts = batch['concept'].numpy().reshape(-1, 1, batch['concept'].shape[1])
+            explainer = shap.PermutationExplainer(wrapped_model, masker=masker, 
+                                                  batch_size=shap_batch_size)
+            
+            # resize bs, seq_len to bs, 1, seq_len
+            # batch_size, 1, seq_len. expected by SHAP
+            print('concept reshaped', concepts.shape)
+            n_permutations = concepts.shape[-1] * 2 + 1
+            shap_values = explainer.shap_values(concepts, npermutations=n_permutations)
+            print("shap_values: ", shap_values)
+            all_shap_values = insert_shap_values(all_shap_values, concepts, shap_values)
+            
+            
+            if i > 2:
+                break
+    return all_shap_values
+    
+def insert_shap_values(
+        all_shap_values: np.ndarray, 
+        concepts: np.ndarray, 
+        shap_values: np.ndarray)->np.ndarray:
+    ind = concepts.flatten()
+    all_shap_values[ind] = (all_shap_values[ind] + shap_values.flatten())/2 # running average
+    return all_shap_values
 
 def _limit_patients(indices_or_pids: list, split: str)->list:
     if f'number_of_{split}_patients' in cfg.data:
@@ -141,79 +98,79 @@ def _limit_patients(indices_or_pids: list, split: str)->list:
             raise ValueError(f"Number of train patients is {len(indices_or_pids)}, but should be at least {number_of_patients}")
     return indices_or_pids
 
-def cv_loop(data: Data, train_val_indices: list, test_data: Data)->None:
-    """Loop over cross validation folds."""
-    for fold, (train_indices, val_indices) in enumerate(get_n_splits_cv(data, N_SPLITS, train_val_indices)):
-        fold += 1
-        logger.info(f"Training fold {fold}/{N_SPLITS}")
-        logger.info("Splitting data")
-        train_indices = _limit_patients(train_indices, 'train')
-        val_indices = _limit_patients(val_indices, 'val')
-        split_and_finetune(data, train_indices, val_indices, fold, test_data)
-        if fold>1:
-            break
-def finetune_without_cv(data: Data, train_val_indices:list, test_data: Data=None)->None:
-    val_split = cfg.data.get('val_split', DEAFAULT_VAL_SPLIT)
-    logger.info(f"Splitting train_val of length {len(train_val_indices)} into train and val with val_split={val_split}")
-    train_indices = train_val_indices[:int(len(train_val_indices)*(1-val_split))]
-    val_indices = train_val_indices[int(len(train_val_indices)*(1-val_split)):]
-    split_and_finetune(data, train_indices, val_indices, 1, test_data)
-
-def cv_loop_predefined_splits(data: Data, predefined_splits_dir: str, test_data: Data)->int:
+def cv_loop_predefined_splits(
+        data: Data, 
+        predefined_splits_dir: str, 
+        finetune_folder:str,
+        fi_folder: str,
+        logger
+        )->int:
     """Loop over predefined splits"""
     # find fold_1, fold_2, ... folders in predefined_splits_dir
     fold_dirs = [join(predefined_splits_dir, d) for d in os.listdir(predefined_splits_dir) if os.path.isdir(os.path.join(predefined_splits_dir, d)) and 'fold_' in d]
-    N_SPLITS = len(fold_dirs)
+    all_shap_values = np.zeros(len(data.vocabulary))
     for fold_dir in fold_dirs:
         fold = int(split(fold_dir)[1].split('_')[1])
         logger.info(f"Training fold {fold}/{len(fold_dirs)}")
-        train_data, val_data = load_and_select_splits(fold_dir, data)
-        train_pids = _limit_patients(train_data.pids, 'train')
-        val_pids = _limit_patients(val_data.pids, 'val')
-        if len(train_pids)<len(train_data.pids):
-            train_data = data.select_data_subset_by_pids(train_pids, mode='train')
-        if len(val_pids)<len(val_data.pids):
-            val_data = data.select_data_subset_by_pids(val_pids, mode='val')
-        check_data_for_overlap(train_data, val_data, test_data)
-        finetune_fold(cfg, train_data, val_data, fold, test_data)
-    return N_SPLITS
+        all_shap_values = compute_fold(
+            all_shap_values=all_shap_values,
+            cfg=cfg, 
+            data=data,
+            fold=fold, 
+            finetune_folder=finetune_folder, 
+            fi_folder=fi_folder,
+            logger=logger)
+        
+    return all_shap_values
+
+
+def prepare_and_load_data():
+    cfg, run, mount_context, azure_context = initialize_configuration_finetune(config_path, dataset_name=BLOBSTORE)
+    date = datetime.now().strftime("%Y%m%d-%H%M")
+    
+    fi_folder = join(cfg.paths.output_path, f'feature_importance_shap_{date}')
+    os.makedirs(fi_folder, exist_ok=True)
+
+    finetune_folder = cfg.paths.get("model_path")
+    logger = setup_logger(fi_folder, 'info.log')
+    logger.info(f"Config Paths: {cfg.paths}")
+    logger.info(f"Update config with pretrain and ft information.")
+    cfg = update_test_cfg_with_pt_ft_cfgs(cfg, finetune_folder)
+    cfg = fix_tmp_prefixes_for_azure_paths(cfg, azure_context)
+    
+    cfg.save_to_yaml(join(fi_folder, 'feature_importance_config.yaml'))
+   
+    log_config(cfg, logger)
+    cfg.paths.run_name = split(fi_folder)[-1]
+
+    if not cfg.data.get('preprocess', False):
+        logger.info(f"Load processed test data from {cfg.paths.model_path}")
+        data = Data.load_from_directory(cfg.paths.model_path, mode='')
+    else:
+        raise ValueError("Not implemented yet. Just use preprocessed data.")
+        #dataset_preparer = DatasetPreparer(cfg)
+        #data = dataset_preparer.prepare_finetune_data() 
+    return data, mount_context, cfg, run, logger, fi_folder, azure_context
+
 
 if __name__ == '__main__':
-    cfg, run, mount_context, pretrain_model_path = Initializer.initialize_configuration_finetune(config_path, dataset_name=BLOBSTORE)
-
-    logger, finetune_folder = DirectoryPreparer.setup_run_folder(cfg)
-    
-    copy_data_config(cfg, finetune_folder)
-    copy_pretrain_config(cfg, finetune_folder)
-    cfg.save_to_yaml(join(finetune_folder, 'finetune_config.yaml'))
-    
-    dataset_preparer = DatasetPreparer(cfg)
-    data = dataset_preparer.prepare_finetune_data()    
-
-    if 'predefined_splits' in cfg.paths:
-        logger.info('Using predefined splits')
-        test_pids = torch.load(join(cfg.paths.predefined_splits, 'test_pids.pt')) if os.path.exists(join(cfg.paths.predefined_splits, 'test_pids.pt')) else []
-        test_pids = list(set(test_pids))
-        test_data = data.select_data_subset_by_pids(test_pids, mode='test')
-        save_data(test_data, finetune_folder)
-        N_SPLITS = cv_loop_predefined_splits(data, cfg.paths.predefined_splits, test_data)
-
+    data, mount_context, cfg, run, logger, fi_folder, azure_context = prepare_and_load_data()
+    if 'test_features.pt' in os.listdir(cfg.paths.model_path):
+        test_data = Data.load_from_directory(cfg.paths.model_path, mode='test')
     else:
-        logger.info('Splitting data')
-        test_data, train_val_indices = split_into_test_data_and_train_val_indices(cfg, data)
-        save_data(test_data, finetune_folder)
-        if N_SPLITS > 1:
-            cv_loop(data, train_val_indices, test_data)
-        else:
-            finetune_without_cv(data, train_val_indices, test_data)
-
-    compute_and_save_scores_mean_std(N_SPLITS, finetune_folder, mode='val')
-    if len(test_data) > 0:
-        compute_and_save_scores_mean_std(N_SPLITS, finetune_folder, mode='test')    
+        test_data = Data()
+        
+    shap_values = cv_loop_predefined_splits(data, 
+                            predefined_splits_dir=cfg.paths.model_path, 
+                            finetune_folder=cfg.paths.model_path,
+                            fi_folder=fi_folder,
+                            logger=logger)
+    print('all shap_values', shap_values)
+    torch.save(shap_values, join(fi_folder, 'shap_values.pt'))
     
     if cfg.env=='azure':
-        save_path = pretrain_model_path if cfg.paths.get("save_folder_path", None) is None else cfg.paths.save_folder_path
-        save_to_blobstore(local_path=cfg.paths.run_name, 
-                          remote_path=join(BLOBSTORE, save_path, cfg.paths.run_name))
+        save_to_blobstore(local_path='', # uses everything in 'outputs' 
+                          remote_path=join(BLOBSTORE, fix_tmp_prefixes_for_azure_paths(cfg.paths.model_path, azure_context)))
         mount_context.stop()
+
     logger.info('Done')
