@@ -26,7 +26,7 @@ class BertEHREncoder(BertModel):
                 layer.intermediate.intermediate_act_fn = SwiGLU(config)
                 # layer.output.LayerNorm = RMSNorm(config.hidden_size, eps=config.layer_norm_eps) # We dont use RMSNorm (only speedup, no performance gain)
 
-    def forward(self, batch: dict=None, inputs_embeds: torch.tensor=None):
+    def forward(self, batch: dict=None, inputs_embeds: torch.tensor=None, **kwargs):
         """
         Forward pass for the model. Either batch or inputs_embeds must be provided.
         Inputs_embeds is prioritized over batch.
@@ -43,6 +43,7 @@ class BertEHREncoder(BertModel):
                 attention_mask=batch.get('attention_mask', None),
                 token_type_ids=batch.get('segment', None),
                 position_ids=position_ids,    
+                **kwargs
         )
         else:
             raise ValueError("Either batch or inputs_embeds must be provided.")
@@ -54,8 +55,8 @@ class BertEHRModel(BertEHREncoder):
         self.loss_fct = nn.CrossEntropyLoss()
         self.cls = MLMHead(config)
             
-    def forward(self, batch: dict, inputs_embeds: torch.tensor=None):
-        outputs = super().forward(batch=batch, inputs_embeds=inputs_embeds)
+    def forward(self, batch: dict, inputs_embeds: torch.tensor=None, **kwargs):
+        outputs = super().forward(batch=batch, inputs_embeds=inputs_embeds, **kwargs)
         sequence_output = outputs[0]    # Last hidden state
         logits = self.cls(sequence_output, batch['attention_mask'])
         outputs.logits = logits
