@@ -79,7 +79,7 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     for name, param in perturbation_model.named_parameters():
         if param.requires_grad:
             logger.info(f"{name}: {param.size()}")
-    assert len(train_data.vocabulary)==perturbation_model.noise_simulator.sigmas_embedding.weight.shape[0], f"Vocabulary size {len(train_data.vocabulary)} does not match sigmas size {perturbation_model.noise_simulator.sigmas_embedding.weight.shape[0]}"
+    assert len(train_data.vocabulary)==len(perturbation_model.get_sigmas_weights()), f"Vocabulary size {len(train_data.vocabulary)} does not match sigmas size {len(perturbation_model.get_sigmas_weights())}"
     modelmanager.model_path = None # to initialize training components form scratch
     
     optimizer, sampler, scheduler, cfg = modelmanager.initialize_training_components(
@@ -168,7 +168,7 @@ def prepare_and_load_data():
     os.makedirs(fi_folder, exist_ok=True)
 
     finetune_folder = cfg.paths.get("model_path")
-    logger = setup_logger(fi_folder, 'feature_importance.log')
+    logger = setup_logger(fi_folder, 'info.log')
     logger.info(f"Config Paths: {cfg.paths}")
     logger.info(f"Update config with pretrain and ft information.")
     cfg = update_test_cfg_with_pt_ft_cfgs(cfg, finetune_folder)

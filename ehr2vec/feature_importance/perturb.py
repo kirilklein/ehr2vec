@@ -31,10 +31,10 @@ class PerturbationModel(torch.nn.Module):
     def set_inverse_frequency(self, concept_frequency):
         """Set the inverse frequency of the concepts to the sigmas. If not set, all sigmas are set to 1.0."""
         if concept_frequency is not None:
-            if len(concept_frequency)!=len(self.noise_simulator.sigmas_embedding.weight):
+            if len(concept_frequency)!=len(self.noise_simulator.thetas_embedding.weight):
                 raise ValueError("Concept frequency should have the same length as the sigmas.")
             return (1/(concept_frequency+1e-6))
-        return torch.ones_like(self.noise_simulator.sigmas_embedding.weight)
+        return torch.ones_like(self.noise_simulator.thetas_embedding.weight)
 
     def forward(self, batch: dict):
         original_output = self.bert_model(batch=batch,output_hidden_states=True)  
@@ -49,7 +49,7 @@ class PerturbationModel(torch.nn.Module):
         for param in self.bert_model.parameters():
             param.requires_grad = False
 
-    def perturbation_loss(self, original_output, perturbed_output, batch)->torch.Tensor:
+    def perturbation_loss(self, original_output: torch.Tensor, perturbed_output: torch.Tensor, batch: dict)->torch.Tensor:
         """
         Calculate the perturbation loss as presented in eq. 7 in the paper:
         Towards a deep and unified understanding of deep neural models in NLP.
@@ -65,26 +65,30 @@ class PerturbationModel(torch.nn.Module):
         
         squared_diff = (logits - perturbed_logits)**2
 
-        sigmas = self.noise_simulator.sigmas_embedding.weight
+        thetas = self.noise_simulator.thetas_embedding.weight # more efficient than getting sigmas and then applying log
         
         # Regularization term on sigmas without harsh scaling
-        first_term = -torch.log(sigmas).nanmean()
+        first_term = -thetas.mean()
 
         # Normalize squared differences
         second_term = (self.regularization_term * squared_diff / (logits.std() + 1e-6)).mean()
-
         return first_term + second_term
 
     def log(self, logger):
         log_string = "Perturbation model:\n"
+        sigmas = self.get_sigmas_weights()
         log_string += f"\t Regularization term: {self.regularization_term}\n"
-        log_string += f"\tMin sigma: {self.noise_simulator.sigmas_embedding.weight.min()}\n"
-        log_string += f"\tMax sigma: {self.noise_simulator.sigmas_embedding.weight.max()}\n"
-        log_string += f"\tMean sigma: {self.noise_simulator.sigmas_embedding.weight.mean()}\n"
+        log_string += f"\tMin sigma: {round(sigmas.min(),2)}\n"
+        log_string += f"\tMax sigma: {round(sigmas.max(),2)}\n"
+        log_string += f"\tMean sigma: {round(sigmas.mean(),2)}\n"
         logger.info(log_string)
         
     def save_sigmas(self, path:str)->None:
-        torch.save(self.noise_simulator.sigmas_embedding.weight.flatten(), path)
+        torch.save(self.get_sigmas_weights(), path)
+    
+    def get_sigmas_weights(self)->torch.Tensor:
+        """Return the sigmas weights (flatten) of the embedding layer."""
+        return self.noise_simulator.get_sigmas_weights()
 
 class GaussianNoise(torch.nn.Module):
     """Simulate Gaussian noise with trainable sigma to add to the embeddings"""
@@ -95,17 +99,25 @@ class GaussianNoise(torch.nn.Module):
         self.initialize()
 
     def initialize(self):
-        """Initialize the noise module with an embedding layer for sigmas."""
+        """Initialize the noise module with an embedding layer for thetas. Sigmas are obtained by exp(thetas)."""
         num_concepts = len(self.bert_model.embeddings.concept_embeddings.weight.data)
-        self.sigmas_embedding = torch.nn.Embedding(num_concepts, 1)
-        self.sigmas_embedding.weight.data.fill_(1e-3)  # Initialize all sigma values to 1
+        self.thetas_embedding = torch.nn.Embedding(num_concepts, 1)
+        # Initialize thetas such that exp(theta) starts close to 0
+        self.thetas_embedding.weight.data.fill_(-10)  # exp(-10) = 4.5e-5
 
     def simulate_noise(self, concepts, embeddings: torch.Tensor)->torch.Tensor:
-        """Simulate Gaussian noise using the sigmas"""
-        concept_sigmas = self.sigmas_embedding(concepts).squeeze(-1)
+        """Simulate Gaussian noise using the sigmas derived from thetas"""
+        thetas = self.thetas_embedding(concepts).squeeze(-1) # select only for present concepts
+        sigmas = torch.exp(thetas)
+        
         std_normal_noise = torch.randn_like(embeddings, device=embeddings.device)
-        scaled_noise = std_normal_noise * concept_sigmas.unsqueeze(-1)
+        scaled_noise = std_normal_noise * sigmas.unsqueeze(-1)
         return scaled_noise
+    
+    def get_sigmas_weights(self)->torch.Tensor:
+        """Return the sigmas as weights of the embedding layer."""
+        return torch.exp(self.thetas_embedding.weight).flatten()
+
 
 class ModelOutputs:
     def __init__(self, logits=None, perturbed_logits=None, loss=None, hidden_states=None, perturbed_hidden_states=None):
@@ -114,3 +126,5 @@ class ModelOutputs:
         self.perturbed_logits = perturbed_logits
         self.hidden_states = hidden_states
         self.perturbed_hidden_states = perturbed_hidden_states
+
+    
