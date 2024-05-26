@@ -47,7 +47,11 @@ class BertEHREncoder(BertModel):
         )
         else:
             raise ValueError("Either batch or inputs_embeds must be provided.")
-            
+    
+    def freeze(self):
+        """Freeze all model parameters."""
+        for param in self.parameters():
+            param.requires_grad = False
 
 class BertEHRModel(BertEHREncoder):
     def __init__(self, config):

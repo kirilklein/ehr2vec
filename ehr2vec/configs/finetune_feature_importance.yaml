@@ -12,6 +12,7 @@ metrics:
     _target_: evaluation.metrics.PR_AUC
 model:
   lambda: .001
+  scale_with_frequency: true
 data:
   min_len: 1
   # preprocess: True

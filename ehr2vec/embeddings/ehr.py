@@ -36,6 +36,11 @@ class BaseEmbeddings(nn.Module):
         else:
             self.a = self.b = self.c = self.d = 1
 
+    def freeze(self):
+        """Freeze the embeddings."""
+        for param in self.parameters():
+            param.requires_grad = False
+
 class EhrEmbeddings(BaseEmbeddings):
     """
         EHR Embeddings
@@ -137,7 +142,4 @@ class PerturbedEHREmbeddings(EhrEmbeddings):
         """Sets the parameters of this instance to the parameters of the given EhrEmbeddings instance."""
         self.load_state_dict(ehr_embeddings.state_dict())
     
-    def freeze_embeddings(self):
-        """Freeze the embeddings."""
-        for param in self.parameters():
-            param.requires_grad = False
+

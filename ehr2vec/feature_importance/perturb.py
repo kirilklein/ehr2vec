@@ -1,18 +1,18 @@
 import torch
-from transformers import BertModel
 
+from ehr2vec.model.model import BertEHRModel
 from ehr2vec.common.config import Config
 from ehr2vec.embeddings.ehr import PerturbedEHREmbeddings
 
 
 class PerturbationModel(torch.nn.Module):
-    def __init__(self, bert_model:BertModel, cfg:Config, concept_frequency=None):
+    def __init__(self, bert_model:BertEHRModel, cfg:Config, concept_frequency=None):
         """Lambda determines how much the """
         super().__init__()
         self.config = cfg
 
         self.bert_model = bert_model
-        self.freeze_bert()
+        self.bert_model.freeze()
         self.noise_simulator = GaussianNoise(bert_model, cfg)
         
         self.lambda_ = self.config.get('lambda', .01)
@@ -26,7 +26,7 @@ class PerturbationModel(torch.nn.Module):
 
         self.embeddings_perturb = PerturbedEHREmbeddings(self.bert_model.config)
         self.embeddings_perturb.set_parameters(self.bert_model.embeddings)
-        self.embeddings_perturb.freeze_embeddings()
+        self.embeddings_perturb.freeze()
         
     def set_inverse_frequency(self, concept_frequency):
         """Set the inverse frequency of the concepts to the sigmas. If not set, all sigmas are set to 1.0."""
@@ -60,12 +60,10 @@ class PerturbationModel(torch.nn.Module):
             perturbed_output: Model output with perturbation
             batch: Input batch, needed to access the correct sigmas
         """
-        # Assuming hidden states are accessible from original_output and perturbed_output
-        original_hidden = original_output.hidden_states[-1]  # Last layer hidden states
-        perturbed_hidden = perturbed_output.hidden_states[-1]
+        logits = original_output.logits
+        perturbed_logits = perturbed_output.logits
         
-        # Calculate squared differences in hidden states
-        squared_diff = (original_hidden - perturbed_hidden) ** 2
+        squared_diff = (logits - perturbed_logits)**2
 
         sigmas = self.noise_simulator.sigmas_embedding.weight
         
@@ -73,11 +71,9 @@ class PerturbationModel(torch.nn.Module):
         first_term = -torch.log(sigmas).nanmean()
 
         # Normalize squared differences
-        second_term = (self.regularization_term * squared_diff / (original_hidden.std() + 1e-6)).mean()
+        second_term = (self.regularization_term * squared_diff / (logits.std() + 1e-6)).mean()
 
-        # Combine the terms to form the final loss
-        loss = first_term + second_term
-        return loss
+        return first_term + second_term
 
     def log(self, logger):
         log_string = "Perturbation model:\n"
