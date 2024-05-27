@@ -22,7 +22,7 @@ from ehr2vec.data.dataset import BinaryOutcomeDataset
 from ehr2vec.evaluation.utils import check_data_for_overlap
 from ehr2vec.evaluation.visualization import plot_most_important_features
 from ehr2vec.feature_importance.perturb import PerturbationModel
-from ehr2vec.feature_importance.perturb_utils import average_sigmas, log_most_important_features, compute_concept_frequency
+from ehr2vec.feature_importance.perturb_utils import average_sigmas, log_most_important_features_for_perturbation_model, compute_concept_frequency
 from ehr2vec.trainer.trainer import EHRTrainer
 
 
@@ -71,6 +71,7 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
     
     if cfg.model.get('scale_with_frequency', False):
         concept_frequency = compute_concept_frequency(train_data.features, train_data.vocabulary) 
+        torch.save(concept_frequency, join(fi_folder, 'concept_frequency.pt'))
     else:
         concept_frequency = None
     # initialize perturbation model
@@ -113,7 +114,7 @@ def finetune_fold(cfg, train_data:Data, val_data:Data,
         trainer._evaluate(checkpoint['epoch'], mode='test')
     # save sigmas from the model
     perturbation_model.save_sigmas(join(fi_folder, f'sigmas_fold_{fold}.pt'))
-    log_most_important_features(perturbation_model, train_data.vocabulary)
+    log_most_important_features_for_perturbation_model(perturbation_model, train_data.vocabulary)
 
 
 def _limit_patients(indices_or_pids: list, split: str)->list:
@@ -207,7 +208,7 @@ if __name__ == '__main__':
     plot_most_important_features(data.vocabulary, sigmas, fi_folder)
     if cfg.env=='azure':
         save_to_blobstore(local_path='', # uses everything in 'outputs' 
-                          remote_path=join(BLOBSTORE, fix_tmp_prefixes_for_azure_paths(cfg.paths.model_path, azure_context=azure_context)))
+                          remote_path=join(BLOBSTORE, cfg.paths.model_path))
         mount_context.stop()
 
     logger.info('Done')

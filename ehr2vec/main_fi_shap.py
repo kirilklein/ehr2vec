@@ -20,8 +20,10 @@ from ehr2vec.common.setup import (fix_tmp_prefixes_for_azure_paths, get_args,
                                   update_test_cfg_with_pt_ft_cfgs)
 from ehr2vec.common.utils import Data
 from ehr2vec.data.dataset import BinaryOutcomeDataset
-from ehr2vec.dataloader.collate_fn import dynamic_padding
 from ehr2vec.feature_importance.shap import BEHRTWrapper, EHRMasker
+from ehr2vec.feature_importance.shap_utils import insert_shap_values
+from ehr2vec.feature_importance.utils import log_most_important_features
+from ehr2vec.trainer.utils import get_tqdm
 
 CONFIG_NAME = 'shap_feature_importance.yaml'
 BLOBSTORE='CINF'
@@ -60,7 +62,7 @@ def compute_fold(
     # the explainer creates n_permutation copies of it, 
     # which we then pass as a batch to the modelwrapper
     with torch.no_grad():
-        for i, batch in enumerate(dataloader):
+        for i, batch in enumerate(get_tqdm(dataloader)):
             shap_batch_size = cfg.shap.get('batch_size', 16)
             wrapped_model = BEHRTWrapper(finetuned_model, batch)
             concepts = batch['concept'].numpy().reshape(-1, 1, batch['concept'].shape[1])
@@ -69,34 +71,14 @@ def compute_fold(
             
             # resize bs, seq_len to bs, 1, seq_len
             # batch_size, 1, seq_len. expected by SHAP
-            print('concept reshaped', concepts.shape)
-            n_permutations = concepts.shape[-1] * 2 + 1
+            n_permutations = concepts.shape[-1] * 2 + 1 # required by SHAP
             shap_values = explainer.shap_values(concepts, npermutations=n_permutations)
-            print("shap_values: ", shap_values)
             all_shap_values = insert_shap_values(all_shap_values, concepts, shap_values)
-            
-            
-            if i > 2:
-                break
-    return all_shap_values
-    
-def insert_shap_values(
-        all_shap_values: np.ndarray, 
-        concepts: np.ndarray, 
-        shap_values: np.ndarray)->np.ndarray:
-    ind = concepts.flatten()
-    all_shap_values[ind] = (all_shap_values[ind] + shap_values.flatten())/2 # running average
+            log_most_important_features(all_shap_values, data.vocabulary, num_features=20) #for testing, can be removed later
+            # if i > 100: # for testing
+             #   break
     return all_shap_values
 
-def _limit_patients(indices_or_pids: list, split: str)->list:
-    if f'number_of_{split}_patients' in cfg.data:
-        number_of_patients = cfg.data.get(f'number_of_{split}_patients')
-        if len(indices_or_pids) >= number_of_patients:
-            indices_or_pids = indices_or_pids[:number_of_patients]
-            logger.info(f"Number of {split} patients is limited to {number_of_patients}")
-        else:
-            raise ValueError(f"Number of train patients is {len(indices_or_pids)}, but should be at least {number_of_patients}")
-    return indices_or_pids
 
 def cv_loop_predefined_splits(
         data: Data, 
@@ -165,12 +147,13 @@ if __name__ == '__main__':
                             finetune_folder=cfg.paths.model_path,
                             fi_folder=fi_folder,
                             logger=logger)
-    print('all shap_values', shap_values)
+    # print('all shap_values', shap_values)
     torch.save(shap_values, join(fi_folder, 'shap_values.pt'))
-    
+    log_most_important_features(shap_values, data.vocabulary, num_features=20)
+
     if cfg.env=='azure':
         save_to_blobstore(local_path='', # uses everything in 'outputs' 
-                          remote_path=join(BLOBSTORE, fix_tmp_prefixes_for_azure_paths(cfg.paths.model_path, azure_context)))
+                          remote_path=join(BLOBSTORE, cfg.paths.model_path))
         mount_context.stop()
 
     logger.info('Done')
