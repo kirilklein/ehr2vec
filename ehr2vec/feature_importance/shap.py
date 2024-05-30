@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from typing import Dict
+from typing import Dict, List
 from ehr2vec.model.model import BertForFineTuning
 
 class EHRMasker:
@@ -51,3 +51,46 @@ class BEHRTWrapper(torch.nn.Module):
         for key in batch: # copy all entries in batch to be the same shape along first dimension as concepts
             if key != 'concept': # this will be taken from the explainer and is already in the correct shape
                 batch[key] = batch[key].repeat(concept.shape[0], 1)
+
+
+class DeepSHAP_BEHRTWrapper(torch.nn.Module):
+    def __init__(self, model: BertForFineTuning) -> None:
+        """
+        Modelwrapper to use with DeepSHAP explainer.
+        To be able to explain contributions of each input stream e.g. concept, age, etc.
+        we need to embed each input stream separately.
+        DeepExplainer will pass them as a list to the model where they can be summed and forwarded.
+        """
+        super().__init__()
+        self.model = model
+        self.f_embeddings = {
+            'concept': model.embeddings.concept_embeddings,
+            'age': model.embeddings.age_embeddings,
+            'abspos': model.embeddings.abspos_embeddings,
+            'segment': model.embeddings.segment_embeddings
+        }
+
+    def __call__(self, *args):
+        """
+        Takes a list of embeddings and sums them to pass to BEHRTEncoder as inputs_embeds.
+        """
+        print('stacked input emebds', torch.stack(args).shape)
+        #inputs_embeds = torch.stack(args[:-1]).sum(dim=0) # sum over the embeddings
+        #outputs = self.model(inputs_embeds=inputs_embeds, batch={'attention_mask': args[-1]}) # last element is attention_mask
+        inputs_embeds = torch.stack(args).sum(dim=0) # sum over the embeddings
+        print('inputs_embeds shape', inputs_embeds.shape)
+        outputs = self.model(inputs_embeds=inputs_embeds) # last element is attention_mask
+        return outputs.logits 
+    
+    def get_embeddings(self, batch: Dict[str, torch.Tensor]
+                 )->Dict[str, torch.Tensor]:
+        """
+        Takes a batch of inputs, where each feature is of shape bs, seq_len 
+        and returns the embeddings in the shape of bs, seq_len, hidden_dim for each feature.
+        """
+        embedded_batch = {k: self.f_embeddings[k](v) for 
+         k, v in batch.items() if k in self.f_embeddings}
+        # embedded_batch['attention_mask'] = batch['attention_mask']
+        return embedded_batch
+    
+

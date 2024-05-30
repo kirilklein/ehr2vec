@@ -59,15 +59,15 @@ class BertEHRModel(BertEHREncoder):
         self.loss_fct = nn.CrossEntropyLoss()
         self.cls = MLMHead(config)
             
-    def forward(self, batch: dict, inputs_embeds: torch.tensor=None, **kwargs):
+    def forward(self, batch: dict=None, inputs_embeds: torch.tensor=None, **kwargs):
         outputs = super().forward(batch=batch, inputs_embeds=inputs_embeds, **kwargs)
         sequence_output = outputs[0]    # Last hidden state
-        logits = self.cls(sequence_output, batch['attention_mask'])
+        attention_mask = batch['attention_mask'] if batch is not None else torch.ones(inputs_embeds.shape[:2], device=inputs_embeds.device).int()
+        logits = self.cls(sequence_output, attention_mask=attention_mask)
         outputs.logits = logits
-
-        if batch.get('target', None) is not None:
-            outputs.loss = self.get_loss(logits, batch['target'])
-
+        if batch is not None:
+            if batch.get('target', None) is not None:
+                outputs.loss = self.get_loss(logits, batch['target'])
         return outputs
 
     def get_loss(self, logits, labels):
