@@ -257,8 +257,8 @@ class OutcomeHandler:
 
     @staticmethod
     def filter_outcomes_by_pids(outcomes: pd.DataFrame, data: Data, type_info:str='')->pd.DataFrame:
-        """Filter outcomes to include only patients in the data."""
-        logger.info(f"Filtering {type_info} to include only patients in the data.")
+        """Filter outcomes to include only patients which are in the data."""
+        logger.info(f"Filtering {type_info} to include only data patients which are present in the data.")
         logger.info(f"Original number of patients in outcomes: {len(outcomes.PID.unique())}")
         filtered_outcomes = outcomes[outcomes['PID'].isin(data.pids)]
         logger.info(f"Number of patients in outcomes after filtering: {len(outcomes.PID.unique())}")

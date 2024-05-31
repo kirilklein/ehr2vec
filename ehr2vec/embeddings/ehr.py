@@ -67,11 +67,8 @@ class EhrEmbeddings(BaseEmbeddings):
         logger.info("Initialize Concept/Segment/Age embeddings.")
         self.concept_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
         self.age_embeddings = Time2Vec(1, config.hidden_size, init_scale=TIME2VEC_AGE_MULTIPLIER, clip_min=TIME2VEC_MIN_CLIP, clip_max=TIME2VEC_MAX_CLIP)
-        if config.to_dict().get('abspos_embeddings', True):
-            logger.info("Initialize time2vec(abspos) embeddings.")
-            self.abspos_embeddings = Time2Vec(1, config.hidden_size, init_scale=TIME2VEC_ABSPOS_MULTIPLIER, clip_min=TIME2VEC_MIN_CLIP, clip_max=TIME2VEC_MAX_CLIP)
-        else:
-            self.abspos_embeddings = None
+        logger.info("Initialize time2vec(abspos) embeddings.")
+        self.abspos_embeddings = Time2Vec(1, config.hidden_size, init_scale=TIME2VEC_ABSPOS_MULTIPLIER, clip_min=TIME2VEC_MIN_CLIP, clip_max=TIME2VEC_MAX_CLIP)
         self.segment_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
         
     def forward(
