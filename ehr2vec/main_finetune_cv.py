@@ -11,7 +11,7 @@ from ehr2vec.common.setup import (DirectoryPreparer, copy_data_config,
 from ehr2vec.common.utils import Data, compute_number_of_warmup_steps
 from ehr2vec.data.dataset import BinaryOutcomeDataset
 from ehr2vec.data.prepare_data import DatasetPreparer
-from ehr2vec.data.split import get_n_splits_cv
+from ehr2vec.data.split import get_n_splits_cv, split_indices_into_train_val
 from ehr2vec.evaluation.utils import (
     check_data_for_overlap, compute_and_save_scores_mean_std, save_data,
     split_into_test_data_and_train_val_indices)
@@ -117,8 +117,7 @@ def cv_loop(data: Data, train_val_indices: list, test_data: Data)->None:
 def finetune_without_cv(data: Data, train_val_indices:list, test_data: Data=None)->None:
     val_split = cfg.data.get('val_split', DEAFAULT_VAL_SPLIT)
     logger.info(f"Splitting train_val of length {len(train_val_indices)} into train and val with val_split={val_split}")
-    train_indices = train_val_indices[:int(len(train_val_indices)*(1-val_split))]
-    val_indices = train_val_indices[int(len(train_val_indices)*(1-val_split)):]
+    train_indices, val_indices = split_indices_into_train_val(train_val_indices, val_split)
     split_and_finetune(data, train_indices, val_indices, 1, test_data)
 
 def cv_loop_predefined_splits(data: Data, predefined_splits_dir: str, test_data: Data)->int:

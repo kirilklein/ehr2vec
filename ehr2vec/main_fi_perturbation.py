@@ -19,7 +19,7 @@ from ehr2vec.common.setup import (fix_tmp_prefixes_for_azure_paths, get_args,
                                   update_test_cfg_with_pt_ft_cfgs)
 from ehr2vec.common.utils import Data, compute_number_of_warmup_steps
 from ehr2vec.data.dataset import BinaryOutcomeDataset
-from ehr2vec.evaluation.utils import check_data_for_overlap
+from ehr2vec.data.split import split_data_into_train_val
 from ehr2vec.evaluation.visualization import plot_most_important_features
 from ehr2vec.feature_importance.perturb import PerturbationModel
 from ehr2vec.feature_importance.perturb_utils import average_sigmas, log_most_important_features_for_perturbation_model, compute_concept_frequency
@@ -36,10 +36,15 @@ config_path = join(dirname(abspath(__file__)), args.config_path)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def finetune_fold(cfg, train_data:Data, val_data:Data, 
-                fold:int, finetune_folder:str, fi_folder:str, 
-                run, test_data: Data=None, )->None:
+
+def finetune_fold(
+        cfg, data:Data, 
+        fold:int, finetune_folder:str, fi_folder:str, 
+        run, test_data: Data=None, )->None:
     """Finetune model on one fold"""
+
+    train_data, val_data = split_data_into_train_val(data, cfg.data.get('val_split', DEAFAULT_VAL_SPLIT))
+    
     fold_folder = join(finetune_folder, f'fold_{fold}')
     save_fold_folder = join(fi_folder, f'fold_{fold}')
     if 'scheduler' in cfg:
@@ -142,16 +147,12 @@ def cv_loop_predefined_splits(
     for fold_dir in fold_dirs:
         fold = int(split(fold_dir)[1].split('_')[1])
         logger.info(f"Training fold {fold}/{len(fold_dirs)}")
-        train_data, val_data = load_and_select_splits(fold_dir, data)
-        train_pids = _limit_patients(train_data.pids, 'train')
+        _, val_data = load_and_select_splits(fold_dir, data)
         val_pids = _limit_patients(val_data.pids, 'val')
-        if len(train_pids)<len(train_data.pids):
-            train_data = data.select_data_subset_by_pids(train_pids, mode='train')
         if len(val_pids)<len(val_data.pids):
             val_data = data.select_data_subset_by_pids(val_pids, mode='val')
-        check_data_for_overlap(train_data, val_data, test_data)
+        # use only validation data to train the perturbatino model    
         finetune_fold(cfg=cfg, 
-                      train_data=train_data, 
                       val_data=val_data, 
                       fold=fold, 
                       finetune_folder=finetune_folder, 
