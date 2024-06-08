@@ -132,6 +132,7 @@ class DeathCreator(BaseCreator):
         birthdate_col = self.find_column(patients_info, 'birth')
         deathdate_col = self.find_column(patients_info, 'death')
         logger.info(f'Creating death feature using birthdate column: {birthdate_col} and deathdate column: {deathdate_col}')
+        patients_info = patients_info[patients_info[deathdate_col].notna()]
         
         death_info = {'PID': patients_info['PID'].tolist()}
         death_info['CONCEPT'] = [self.DEATH_CONCEPT] * len(patients_info)
