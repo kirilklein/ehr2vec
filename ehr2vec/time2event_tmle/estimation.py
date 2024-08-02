@@ -122,7 +122,7 @@ def IPCW_estimator(cls_data:pd.DataFrame, data:pd.DataFrame, censoring_model:obj
         survival_curve.append(survival_curve_at_t_prime)
     return np.array(survival_curve), max_time
 
-def estimate_ps(data, model):
+def estimate_ps(data: pd.DataFrame, model: object=LogisticRegressionCV(cv=5)):
     X = data['X'].values.reshape(-1, 1)
     treatment_model = model.fit(X, data['A'])
     data['propensity'] = treatment_model.predict_proba(X)[:, 1]
