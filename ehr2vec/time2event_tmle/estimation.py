@@ -122,6 +122,25 @@ def estimate_ps(data, model):
     data['propensity'] = treatment_model.predict_proba(X)[:, 1]
     return data
 
+
+def fit_failure_model(cls_data, model=GradientBoostingClassifier()):
+    """Fit the failure model."""
+    return _fit_temporal_classifier(cls_data, 'Y_E', model)
+
+def fit_censoring_model(cls_data, model=GradientBoostingClassifier()):
+    """Fit the censoring model."""
+    return _fit_temporal_classifier(cls_data, 'Y_C', model)    
+
+def _fit_temporal_classifier(cls_data, target, model=GradientBoostingClassifier()):
+    """Fit a classifier with the target as the label.
+    Target should be one of 'Y_E' or 'Y_C'.
+    """
+    if target not in ['Y_E', 'Y_C']:
+        raise ValueError("target should be either 'Y_E' or 'Y_C'")
+    X = cls_data[['t', 'A', 'X']]
+    Y = cls_data[target]
+    return model.fit(X, Y)
+
 def full_IPCW(data):
     # 1. Fit the treatment model
     treatment_model = LogisticRegressionCV(cv=5)
@@ -129,11 +148,9 @@ def full_IPCW(data):
 
     # 2. Transform data to fit failure model
     cls_data = transform_data_for_model_estimation(data)
-
+    
     # Step 3: Fit the censoring model
-    Y_C = cls_data['Y_C']
-    X = cls_data[['t', 'A', 'X']]
-    censoring_model = GradientBoostingClassifier().fit(X, Y_C)
+    censoring_model = fit_censoring_model(cls_data, GradientBoostingClassifier())
 
     ipcw_survival_curve, max_time = IPCW_estimator(cls_data, data, censoring_model)   
     return ipcw_survival_curve, max_time
