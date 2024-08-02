@@ -73,8 +73,14 @@ def estimate_survival_probability(data:pd.DataFrame, model:object)->np.ndarray:
 def select_pos_patients_at_risk(cls_data:pd.DataFrame, t_prime:int)->pd.DataFrame:
     event_mask = cls_data['Y_E'] == 1
     event_data = cls_data[event_mask]
-    pos_pids_at_risk = event_data[event_data['t']>t_prime]['pid'].unique() # patients with an event at t_prime or later
-    return cls_data[cls_data.pid.isin(pos_pids_at_risk)]
+    pos_pids_at_risk = select_events_after_t_prime(event_data, t_prime)['pid'].unique() # patients with an event at t_prime or later
+    return select_patients(cls_data, pos_pids_at_risk)
+
+def select_events_after_t_prime(cls_data:pd.DataFrame, t_prime:int)->pd.DataFrame:
+    return cls_data[cls_data['t']>t_prime]
+
+def select_patients(data, pids):
+    return data[data['pid'].isin(pids)]
 
 def select_treated(cls_data:pd.DataFrame)->pd.DataFrame:
     """Select treated patients."""
@@ -122,7 +128,6 @@ def estimate_ps(data, model):
     data['propensity'] = treatment_model.predict_proba(X)[:, 1]
     return data
 
-
 def fit_failure_model(cls_data, model=GradientBoostingClassifier()):
     """Fit the failure model."""
     return _fit_temporal_classifier(cls_data, 'Y_E', model)
@@ -148,7 +153,7 @@ def full_IPCW(data):
 
     # 2. Transform data to fit failure model
     cls_data = transform_data_for_model_estimation(data)
-    
+
     # Step 3: Fit the censoring model
     censoring_model = fit_censoring_model(cls_data, GradientBoostingClassifier())
 
