@@ -79,7 +79,7 @@ def select_pos_patients_at_risk(cls_data:pd.DataFrame, t_prime:int)->pd.DataFram
 def select_events_after_t_prime(cls_data:pd.DataFrame, t_prime:int)->pd.DataFrame:
     return cls_data[cls_data['t']>t_prime]
 
-def select_patients(data, pids):
+def select_patients(data: pd.DataFrame, pids: list)->pd.DataFrame:
     return data[data['pid'].isin(pids)]
 
 def select_treated(cls_data:pd.DataFrame)->pd.DataFrame:
@@ -128,15 +128,15 @@ def estimate_ps(data, model):
     data['propensity'] = treatment_model.predict_proba(X)[:, 1]
     return data
 
-def fit_failure_model(cls_data, model=GradientBoostingClassifier()):
+def fit_failure_model(cls_data: pd.DataFrame, model: object=GradientBoostingClassifier()):
     """Fit the failure model."""
     return _fit_temporal_classifier(cls_data, 'Y_E', model)
 
-def fit_censoring_model(cls_data, model=GradientBoostingClassifier()):
+def fit_censoring_model(cls_data: pd.DataFrame, model: object=GradientBoostingClassifier()):
     """Fit the censoring model."""
     return _fit_temporal_classifier(cls_data, 'Y_C', model)    
 
-def _fit_temporal_classifier(cls_data, target, model=GradientBoostingClassifier()):
+def _fit_temporal_classifier(cls_data: pd.DataFrame, target: str, model: object=GradientBoostingClassifier()):
     """Fit a classifier with the target as the label.
     Target should be one of 'Y_E' or 'Y_C'.
     """
@@ -146,7 +146,7 @@ def _fit_temporal_classifier(cls_data, target, model=GradientBoostingClassifier(
     Y = cls_data[target]
     return model.fit(X, Y)
 
-def full_IPCW(data):
+def full_IPCW(data: pd.DataFrame)->tuple:
     # 1. Fit the treatment model
     treatment_model = LogisticRegressionCV(cv=5)
     data = estimate_ps(data, treatment_model)
