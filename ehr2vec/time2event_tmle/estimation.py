@@ -44,7 +44,7 @@ def transform_data_for_model_estimation(data:pd.DataFrame)->pd.DataFrame:
     expanded_data = pd.DataFrame(expanded_rows)
     return expanded_data
 
-def estimate_survival_probability(data:pd.DataFrame, model:object)->np.ndarray:
+def estimate_survival_probability_at_T(data:pd.DataFrame, model:object)->np.ndarray:
     """
     Estimate the survival curve for a given model.
     It can be censoring or failure event model.    
@@ -90,7 +90,7 @@ def select_events_up_to_t_prime(cls_data:pd.DataFrame, t_prime:int)->pd.DataFram
     """Select events up to time t_prime."""
     return cls_data[cls_data['t']<t_prime]
 
-def compute_curve_for_treated_at_t(N_patients: int, ps:np.ndarray, survival_probs:np.ndarray)->float:
+def compute_IPCW_curve_at_t(N_patients: int, ps:np.ndarray, survival_probs:np.ndarray)->float:
     sum_ = np.sum(1 / (ps * survival_probs))
     return 1/N_patients * sum_
 
@@ -103,7 +103,7 @@ def IPCW_estimator(cls_data:pd.DataFrame, data:pd.DataFrame, censoring_model:obj
     """
     survival_curve = []
     max_time = cls_data['t'].max()
-    censoring_survival_probs = estimate_survival_probability(
+    censoring_survival_probs = estimate_survival_probability_at_T(
             cls_data, censoring_model)
     
     for t_prime in range(1, max_time):
@@ -117,7 +117,7 @@ def IPCW_estimator(cls_data:pd.DataFrame, data:pd.DataFrame, censoring_model:obj
         # 3. Compute the IPCW estimator
         # ! check what n needs to be
         n = cls_data[cls_data['A']==1]['pid'].nunique()
-        survival_curve_at_t_prime = compute_curve_for_treated_at_t(n, selected_ps, selected_survival_probs)
+        survival_curve_at_t_prime = compute_IPCW_curve_at_t(n, selected_ps, selected_survival_probs)
         assert len(selected_ps)==len(selected_survival_probs), 'Length mismatch'
         survival_curve.append(survival_curve_at_t_prime)
     return np.array(survival_curve), max_time
