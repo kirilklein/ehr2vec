@@ -46,14 +46,13 @@ def transform_data_for_model_estimation(data:pd.DataFrame)->pd.DataFrame:
 
 def estimate_survival_probability_at_T(data:pd.DataFrame, model:object)->np.ndarray:
     """
-    Estimate the survival curve for a given model.
-    It can be censoring or failure event model.    
+    Estimate the survival probability at the final time for each patient for a given model (censoring or event).
     Args:
         data (pd.DataFrame): The input data containing T_observed, Y, A, X.
-        model (object): The fitted censoring model.
+        model (object): The fitted censoring/failure model.
     
     Returns:
-        pd.DataFrame: The input data with an additional column 'censoring_probability'.
+        np.ndarray: The estimated survival probabilities for each patient.
     """
     # Prepare the input features for prediction
     X = data[['t', 'A', 'X']]
