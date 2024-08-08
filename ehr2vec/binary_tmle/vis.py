@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 
 def display_results(patient_numbers: list, models: dict, diffs: dict, stds: dict=None, save_path: str=None):    
     # come up with a nice scheme which has at max 3 subplots per row, based on the number of models
-    n_rows = len(models) // 3 + 1 if len(models) % 3 != 0 else 0
+    n_rows = (len(models)-1) // 3 + 1 
     n_cols = 3 if len(models) >= 3 else len(models)
 
     fig, ax = plt.subplots(n_rows, n_cols, figsize=(18, 10))
