@@ -5,22 +5,27 @@ from scipy.special import expit as logistic
 from scipy.stats import norm
 
 
-def simulate_binary_data(n:int, alpha:list, beta:list, seed=42)->pd.DataFrame:
-    """Simulate simple binary outcome data with two covariates and a binary treatment."""
-    np.random.seed(seed)    
+def simulate_binary_data(n:int, alpha:list, beta:list, seed=None)->pd.DataFrame:
+    """Simulate simple binary outcome data with two covariates and a binary treatment simulated from a logistic regression model."""
+    if seed is not None:
+        # ise new generator with seed
+        rng = np.random.default_rng(seed) 
+    else:
+        rng = np.random.default_rng()
     # Simulate covariates
-    X1 = np.random.normal(0, 1, n)
-    X2 = np.random.normal(0, 1, n)
-
+    X = rng.normal(0, 1, (n, 2))
+    X1 = X[:, 0]
+    X2 = X[:, 1]
     # Simulate treatment
     logit_p = alpha[0] + alpha[1] * X1 + alpha[2] * X2
     p = logistic(logit_p)
-    A = np.random.binomial(1, p)
+    A = rng.binomial(1, p)
     # Simulate outcome
     logit_q = beta[0] + beta[1] * A + beta[2] * X1 + beta[3] * X2
     q = logistic(logit_q)
-    Y = np.random.binomial(1, q)
+    Y = rng.binomial(1, q)
     data = pd.DataFrame({'X1': X1, 'X2': X2, 'A': A, 'Y': Y})
+    
     return data
 
 def compute_ATE_theoretical_from_data(data: pd.DataFrame, beta: list):
