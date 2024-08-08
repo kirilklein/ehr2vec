@@ -115,36 +115,3 @@ def TMLE_estimator(data):
     st_error = compute_standard_error(data, H, Q_star_1, Q_star_0, ate_tmle)
     return ate_tmle, st_error
 
-
-def iterative_TMLE_estimator(data, tol=1e-5, max_iter=40):
-    """
-    Estimate the average treatment effect using the targeted maximum likelihood estimation (TMLE) method.
-    ! It does not improve over the one-shot TMLE estimator.
-    """
-    data = tmle_initial_estimates(data)
-    
-    epsilon = 0
-    converged = False
-    iteration = 0
-
-    while (not converged) and (iteration < max_iter):
-        print('|', end='')
-        epsilon_prev = epsilon
-        epsilon, H = estimate_fluctuation_parameter(data)
-        Q_star_1, Q_star_0 = update_Q_star(data, epsilon)
-        
-        # Update the outcome model
-        data['outcome_1'] = Q_star_1
-        data['outcome_0'] = Q_star_0
-        data['outcome'] = data['A'] * Q_star_1 + (1 - data['A']) * Q_star_0
-
-        # Check for convergence
-        if abs(epsilon - epsilon_prev) < tol:
-            # print("Converged after", iteration, "iterations.")
-            converged = True
-        
-        iteration += 1
-    print('eps', epsilon)
-        
-    return (Q_star_1 - Q_star_0).mean()
-
