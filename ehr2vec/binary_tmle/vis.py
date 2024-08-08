@@ -1,4 +1,6 @@
-def display_results(models, diffs, stds):    
+import matplotlib.pyplot as plt
+
+def display_results(patient_numbers: list, models: dict, diffs: dict, stds: dict=None, save_path: str=None):    
     # come up with a nice scheme which has at max 3 subplots per row, based on the number of models
     n_rows = len(models) // 3 + 1 if len(models) % 3 != 0 else 0
     n_cols = 3 if len(models) >= 3 else len(models)
@@ -14,12 +16,15 @@ def display_results(models, diffs, stds):
         for estimator in estimators:
             ax[i].plot(patient_numbers, diffs[estimator][model_name], label=estimator)
 
-            upper_boundary = diffs[estimator][model_name] + stds[estimator][model_name]
-            lower_boundary = diffs[estimator][model_name] - stds[estimator][model_name]
-            ax[i].fill_between(patient_numbers, upper_boundary, lower_boundary, alpha=0.2)
+            if stds is not None:
+                upper_boundary = diffs[estimator][model_name] + stds[estimator][model_name]
+                lower_boundary = diffs[estimator][model_name] - stds[estimator][model_name]
+                ax[i].fill_between(patient_numbers, upper_boundary, lower_boundary, alpha=0.2)
         ax[i].set_title(model_name)
         ax[i].set_xlabel('Number of patients')
         if i == 0:
             ax[i].set_ylabel('Difference to true ATE')
             ax[i].legend(loc=1)  
     plt.subplots_adjust(hspace=0.4)
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
