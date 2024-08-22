@@ -1,0 +1,20 @@
+env: local
+paths:
+  run_name: first
+outcomes_name: "SIMVASTATIN"
+features_dir: ../outputs/features
+loader:
+  data_dir: C:\\Users\\fjn197\\PhD\\projects\\PHAIR\\pipelines\\ehr_preprocess\\ehr_preprocess\\formatted_data\\synthea5000
+  concepts: [
+    medication
+  ]
+  batch_size: 1000
+  chunksize: 5000
+outcomes:
+  SIMVASTATIN: 
+    type: [CONCEPT]
+    match: [['312961']]
+    match_how: contains
+    case_sensitive: true
+  
+    
