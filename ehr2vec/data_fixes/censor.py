@@ -22,6 +22,7 @@ class Censorer:
         self.censor_diag_separately = self.censor_diagnoses_at_end_of_visit or (self.n_hours_diag_censoring!=self.n_hours)
         if self.censor_diag_separately:
             self.diagnoses_codes = self.get_diagnoses_codes()
+            self.sep_code = self.vocabulary.get('[SEP]', -1)
 
     def __call__(self, features: dict, index_dates: list) -> tuple:
         sample_concepts = features["concept"][0]
@@ -87,9 +88,9 @@ class Censorer:
         Censor diagnoses n_hours after the event.
         All diagnoses up to n_hours after index_timestamp are included.
         """
-        diagnoses_flags = self._get_diagnoses_flags(patient['concept'])
+        diagnoses_sep_flags = self.get_diag_or_sep_flags(patient['concept'])
         abs_pos_flags = [True if abspos <= (index_timestamp + self.n_hours_diag_censoring) else False for abspos in patient['abspos']]
-        return self._combine_lists_with_and(diagnoses_flags, abs_pos_flags)
+        return self._combine_lists_with_and(diagnoses_sep_flags, abs_pos_flags)
 
     def _generate_diag_censor_flags_end_of_visit(self, patient: Dict[str, list], index_timestamp: float) -> List[bool]:
         """
@@ -98,12 +99,22 @@ class Censorer:
         """
         last_segment = self._get_last_segment_before_timestamp(patient['segment'], patient['abspos'], index_timestamp)
         last_index_to_include = self._return_last_index_for_element(patient['segment'], last_segment)
-        diagnoses_flags = self._get_diagnoses_flags(patient['concept'])
+        diagnoses_sep_flags = self.get_diag_or_sep_flags(patient['concept'])
         return [
-        i <= last_index_to_include and diag_flag 
-        for i, diag_flag in enumerate(diagnoses_flags)
+        i <= last_index_to_include and flag 
+        for i, flag in enumerate(diagnoses_sep_flags)
             ]
     
+    def get_diag_or_sep_flags(self, concepts: List[Union[int, str]]) -> List[bool]:
+        """Return a list of booleans indicating if the concept is a diagnosis or a separator."""
+        diagnoses_flags = self._get_diagnoses_flags(concepts)
+        sep_flags = self._get_sep_flags(concepts)
+        return self._combine_lists_with_or(diagnoses_flags, sep_flags)
+
+    def _get_sep_flags(self, concepts: List[Union[int, str]]) -> List[bool]:
+        """This function returns a list of booleans indicating if the concept is a separator."""
+        return [concept == self.sep_code for concept in concepts]
+
     @staticmethod
     def _combine_lists_with_and(list1: List[bool], list2: List[bool]) -> List[bool]:
         return [flag1 or flag2 for flag1, flag2 in zip(list1, list2)]
