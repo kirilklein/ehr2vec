@@ -88,7 +88,7 @@ class Censorer:
         Censor diagnoses n_hours after the event.
         All diagnoses up to n_hours after index_timestamp are included.
         """
-        diagnoses_sep_flags = self.get_diag_or_sep_flags(patient['concept'])
+        diagnoses_sep_flags = self.get_combined_diag_sep_flags(patient['concept'])
         abs_pos_flags = [True if abspos <= (index_timestamp + self.n_hours_diag_censoring) else False for abspos in patient['abspos']]
         return self._combine_lists_with_and(diagnoses_sep_flags, abs_pos_flags)
 
@@ -99,17 +99,45 @@ class Censorer:
         """
         last_segment = self._get_last_segment_before_timestamp(patient['segment'], patient['abspos'], index_timestamp)
         last_index_to_include = self._return_last_index_for_element(patient['segment'], last_segment)
-        diagnoses_sep_flags = self.get_diag_or_sep_flags(patient['concept'])
+        diagnoses_sep_flags = self.get_combined_diag_sep_flags(patient['concept'])
         return [
         i <= last_index_to_include and flag 
         for i, flag in enumerate(diagnoses_sep_flags)
             ]
     
-    def get_diag_or_sep_flags(self, concepts: List[Union[int, str]]) -> List[bool]:
-        """Return a list of booleans indicating if the concept is a diagnosis or a separator."""
+    def get_combined_diag_sep_flags(self, concepts: List[Union[int, str]]) -> List[bool]:
+        """
+        Combining diagnoses and separator flags.
+        Only SEP tokens after diagnoses are included.
+        """
         diagnoses_flags = self._get_diagnoses_flags(concepts)
         sep_flags = self._get_sep_flags(concepts)
-        return self._combine_lists_with_or(diagnoses_flags, sep_flags)
+        return self._combine_diag_sep(diagnoses_flags, sep_flags)
+    
+    @staticmethod
+    def _combine_diag_sep(diag_flags:List[bool], sep_flags:List[bool]) -> List[bool]:
+        """
+        Combining diagnoses and separator flags.
+        We want to exclude SEP for visits with no diagnoses. Otherwise issues with the model (more visits than expected->indexing error in visit embeddings)
+        example: 
+        concepts = [D1, SEP, D2, D3, SEP, M1, SEP]
+        diag_flags = [T, F, T, T, F, F, F]
+        sep_flags = [F, T, F, F, T, F, T]
+        result = [T, T, T, T, T, F, F]
+        """
+        result = []
+        diag_seen = False  # Tracks if a diagnosis (True in diag_flags) has been seen since the last separator
+
+        for diag, sep in zip(diag_flags, sep_flags):
+            if diag:
+                diag_seen = True  # A diagnosis has been seen, so keep the SEP flags
+            result.append(diag or (sep and diag_seen))
+
+            # Reset the diag_seen after a SEP, which is included in the result
+            if sep and diag_seen:
+                diag_seen = False
+
+        return result
 
     def _get_sep_flags(self, concepts: List[Union[int, str]]) -> List[bool]:
         """This function returns a list of booleans indicating if the concept is a separator."""
