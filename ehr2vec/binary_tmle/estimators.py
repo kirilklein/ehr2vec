@@ -1,16 +1,19 @@
 import numpy as np
 import pandas as pd
 from scipy.special import expit, logit
-from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LogisticRegression
 from statsmodels.api import add_constant
 from statsmodels.genmod.families import Binomial
 from statsmodels.genmod.generalized_linear_model import GLM
 
 
-def estimate_ps(data: pd.DataFrame, covariates: list,  model: object=LogisticRegressionCV(cv=5)):
+def estimate_ps(data: pd.DataFrame, covariates: list,  model: object=None):
+    if model is None:
+        model = LogisticRegression(penalty=None)
     treatment_model = model.fit(data[covariates], data['A'])
     data['propensity'] = treatment_model.predict_proba(data[covariates])[:, 1]
     return data
+
 def compute_ipw(A, Y, ps):
     Y1_weighted = A * Y / ps
     Y0_weighted = (1 - A) * Y / (1 - ps)
@@ -21,7 +24,7 @@ def sample_std(estimates):
     I = estimates - estimates.mean() 
     return np.sqrt((I**2).sum() / len(estimates)**2)
 
-def IPTW_estimator(data):
+def IPW_estimator(data):
     """Estimate the average treatment effect using the inverse probability of treatment weighting (IPTW) method."""
     # Estimate propensity scores
     A = data['A']
@@ -33,11 +36,15 @@ def IPTW_estimator(data):
     # Estimate ATE using IPTW
     return iptw.mean(), sample_std_iptw
 
-def estimate_outcome(data: pd.DataFrame, covariates: list, model: object=LogisticRegressionCV(cv=5)):
+def estimate_outcome(data: pd.DataFrame, covariates: list, model: object=None):
+    if model is None:
+        model = LogisticRegression(penalty=None)
     X = data[covariates+['A']]
     outcome_model = model.fit(X, data['Y'])
     data['outcome'] = outcome_model.predict_proba(X)[:, 1]
-    return data, model
+    data = estimate_counterfactual_outcome(data, ['X1', 'X2'], outcome_model, 1)
+    data = estimate_counterfactual_outcome(data, ['X1', 'X2'], outcome_model, 0)
+    return data
 
 def AIPW_estimator(data):
     """Augmented Inverse Probability of Treatment Weighting (AIPW) estimator as described in
@@ -48,9 +55,7 @@ def AIPW_estimator(data):
     A = data['A']
     Y = data['Y']
     data = estimate_ps(data, ['X1', 'X2'])
-    data, outcome_model = estimate_outcome(data, ['X1', 'X2'])
-    data = estimate_counterfactual_outcome(data, ['X1', 'X2'], outcome_model, 1)
-    data = estimate_counterfactual_outcome(data, ['X1', 'X2'], outcome_model, 0)
+    
     g = data['propensity']
     Q1 = data['outcome_1']
     Q0 = data['outcome_0']
@@ -83,9 +88,7 @@ def estimate_fluctuation_parameter(data: pd.DataFrame)->float:
 
 def tmle_initial_estimates(data):
     data = estimate_ps(data, ['X1', 'X2'])
-    data, outcome_model = estimate_outcome(data, ['X1', 'X2'])
-    data = estimate_counterfactual_outcome(data, ['X1', 'X2'], outcome_model, 1)
-    data = estimate_counterfactual_outcome(data, ['X1', 'X2'], outcome_model, 0)
+    data = estimate_outcome(data, ['X1', 'X2'])
     return data
 
 def update_Q_star(data, epsilon):
