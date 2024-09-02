@@ -77,13 +77,13 @@ class Censorer:
             return censor_flags
         if self.censor_diag_separately:
             if self.censor_diagnoses_at_end_of_visit:
-                diag_censor_flags = self._generate_diag_censor_flags_end_of_visit(patient, index_timestamp)
+                diag_censor_flags = self._generate_sep_diag_censor_flags_end_of_visit(patient, index_timestamp)
             else:
-                diag_censor_flags = self._generate_diag_censor_flags(patient, index_timestamp)
+                diag_censor_flags = self._generate_sep_diag_censor_flags(patient, index_timestamp)
             censor_flags = self._combine_lists_with_or(censor_flags, diag_censor_flags)
         return censor_flags
     
-    def _generate_diag_censor_flags(self, patient: Dict[str, list], index_timestamp: float) -> List[bool]:
+    def _generate_sep_diag_censor_flags(self, patient: Dict[str, list], index_timestamp: float) -> List[bool]:
         """
         Censor diagnoses n_hours after the event.
         All diagnoses up to n_hours after index_timestamp are included.
@@ -92,7 +92,7 @@ class Censorer:
         abs_pos_flags = [True if abspos <= (index_timestamp + self.n_hours_diag_censoring) else False for abspos in patient['abspos']]
         return self._combine_lists_with_and(diagnoses_sep_flags, abs_pos_flags)
 
-    def _generate_diag_censor_flags_end_of_visit(self, patient: Dict[str, list], index_timestamp: float) -> List[bool]:
+    def _generate_sep_diag_censor_flags_end_of_visit(self, patient: Dict[str, list], index_timestamp: float) -> List[bool]:
         """
         Include diagnoses up to the end of the visit.
         Here, all diagnoses are included up to the end of the visit with index_timestamp.
@@ -139,13 +139,13 @@ class Censorer:
 
         return result
 
-    def _get_sep_flags(self, concepts: List[Union[int, str]]) -> List[bool]:
+    def _get_sep_flags(self, concepts: List[int]) -> List[bool]:
         """This function returns a list of booleans indicating if the concept is a separator."""
-        return [concept == self.sep_code for concept in concepts]
+        return [(concept == self.sep_code) for concept in concepts]
 
     @staticmethod
     def _combine_lists_with_and(list1: List[bool], list2: List[bool]) -> List[bool]:
-        return [flag1 or flag2 for flag1, flag2 in zip(list1, list2)]
+        return [flag1 and flag2 for flag1, flag2 in zip(list1, list2)]
     
     @staticmethod
     def _combine_lists_with_or(list1: List[bool], list2: List[bool]) -> List[bool]:
