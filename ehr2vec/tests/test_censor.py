@@ -60,15 +60,12 @@ class TestCensorer(unittest.TestCase):
         self.assertEqual(result, expected_patient)
 
 
-
 class TestCensorerDiagnosesLater(unittest.TestCase):
 
     def setUp(self):
-        vocabulary={'[CLS]': 0, '[SEP]': 1, 'BG_GENDER_Male': 2, 
-                    'M1':3,'M2':4, 'M3':5,
-                    'D1': 6, 'D2': 7, 'D3':8}
-        self.censorer = Censorer(n_hours=0, n_hours_diag_censoring=3.5, vocabulary=vocabulary, censor_diag_end_of_visit=False)
-        self.censorer.background_length = 3
+        self.vocabulary = {'[CLS]': 0, '[SEP]': 1, 'BG_GENDER_Male': 2, 
+                           'M1': 3, 'M2': 4, 'M3': 5,
+                           'D1': 6, 'D2': 7, 'D3': 8}
         self.index_dates = [2.1]
         self.features = {
             'concept': [['[CLS]', 'BG_GENDER_Male', '[SEP]', 
@@ -81,101 +78,97 @@ class TestCensorerDiagnosesLater(unittest.TestCase):
                         3, 4, 4, 
                         5, 5,
                         6, 6]],
-            'attention_mask': [[1]*14],
+            'attention_mask': [[1] * 14],
             'segment': [[0, 0, 0, 
                          1, 1, 1, 1, 
                          2, 2, 2, 
                          3, 3,
                          4, 4]]
         }
-        self.features['concept'][0] = [vocabulary.get(c) for c in self.features['concept'][0]]
+        self.features = self.convert_concept_to_ids(self.features)
+        self.patient = {k: v[0] for k, v in self.features.items()}
+
+        # Initialize censorers
+        self.censorer = self.create_censorer(censor_diag_end_of_visit=False)
+        self.censorer_end_of_visit = self.create_censorer(censor_diag_end_of_visit=True)
         
-        self.expected_result = {
-            'concept': [['[CLS]', 'BG_GENDER_Male', '[SEP]', 
-                         'D1', 'M1', 'D1', '[SEP]',
-                          'D2', '[SEP]',]],
-            'abspos': [[0, 0, 0, 
-                        1, 2, 2.5, 2.5, 
-                        4, 4]],
-            'attention_mask': [[1]*9],
-            'segment': [[0, 0, 0, 
-                         1, 1, 1, 1,
-                         2, 2,]]
-        }
-        self.expected_censor_flags = [True, True, True,
-                                      True, True, True, True,
-                                      False, True, True,
-                                      False, False,
-                                      False, False]
-        self.expected_result['concept'][0] = [vocabulary.get(c) for c in self.expected_result['concept'][0]]
-        self.patient = {k:v[0] for k,v in self.features.items()}
+        # Expected results
+        self.expected_result = self.convert_concept_to_ids({
+            'concept': [['[CLS]', 'BG_GENDER_Male', '[SEP]', 'D1', 'M1', 'D1', '[SEP]', 'D2', '[SEP]']],
+            'abspos': [[0, 0, 0, 1, 2, 2.5, 2.5, 4, 4]],
+            'attention_mask': [[1] * 9],
+            'segment': [[0, 0, 0, 1, 1, 1, 1, 2, 2]]
+        })
+        self.expected_result_end_of_visit = self.convert_concept_to_ids({
+            'concept': [['[CLS]', 'BG_GENDER_Male', '[SEP]', 'D1', 'M1', 'D1', '[SEP]']],
+            'abspos': [[0, 0, 0, 1, 2, 2.5, 2.5]],
+            'attention_mask': [[1] * 7],
+            'segment': [[0, 0, 0, 1, 1, 1, 1]]
+        })
+        self.expected_censor_flags = [True, True, True, True, True, True, True, False, True, True, False, False, False, False]
+
+    def create_censorer(self, censor_diag_end_of_visit):
+        censorer = Censorer(n_hours=0, n_hours_diag_censoring=3.5, vocabulary=self.vocabulary, censor_diag_end_of_visit=censor_diag_end_of_visit)
+        censorer.background_length = 3
+        return censorer
+
+    def convert_concept_to_ids(self, feature_dict):
+        feature_dict['concept'][0] = [self.vocabulary[c] for c in feature_dict['concept'][0]]
+        return feature_dict
+
+    def test_censor(self):
+        self.run_censor_test(self.censorer, self.expected_result)
+        self.run_censor_test(self.censorer_end_of_visit, self.expected_result_end_of_visit)
+
+    def run_censor_test(self, censorer, expected_result):
+        result = censorer.censor(self.features, self.index_dates)
+        self.assertEqual(result, expected_result)
 
     def test_generate_censor_flags(self):
-        censor_flags = self.censorer._generate_censor_flags(self.patient, self.index_dates[0])                          
-        self.assertEqual(censor_flags, self.expected_censor_flags)
+        self.run_generate_censor_flags_test(
+            self.censorer._generate_censor_flags, 
+            self.expected_censor_flags
+        )
 
-    def test_generate_sep_diag_censor_flags_end_of_visit(self):
-        diag_censor_flags = self.censorer._generate_sep_diag_censor_flags_end_of_visit(self.patient, self.index_dates[0])
-        expected_censor_flags_end_of_visit = [False, False, False,
-                                              True, False, True, True,
-                                              False, False, False,
-                                              False, False,
-                                              False, False]
-        self.assertEqual(diag_censor_flags, expected_censor_flags_end_of_visit)
+    def run_generate_censor_flags_test(self, generate_flags_func, expected_flags):
+        flags = generate_flags_func(self.patient, self.index_dates[0])
+        self.assertEqual(flags, expected_flags)
 
     def test_generate_sep_diag_censor_flags(self):
-        diag_censor_flags = self.censorer._generate_sep_diag_censor_flags(self.patient, self.index_dates[0])
-        expected_censor_flags = [False, False, False,
-                                 True, False, True, True,
-                                 False, True, True,
-                                 False, False,
-                                 False, False]
-        self.assertEqual(diag_censor_flags, expected_censor_flags)
+        self.run_generate_censor_flags_test(
+            self.censorer._generate_sep_diag_censor_flags, 
+            [False, False, False, True, False, True, True, False, True, True, False, False, False, False]
+        )
+
+    def test_generate_sep_diag_censor_flags_end_of_visit(self):
+        self.run_generate_censor_flags_test(
+            self.censorer_end_of_visit._generate_sep_diag_censor_flags_end_of_visit, 
+            [False, False, False, True, False, True, True, False, False, False, False, False, False, False]
+        )
 
     def test_get_diagnoses_flags(self):
         concept = ['D1', 'M1', 'M2', '[SEP]', 'D2']
         expected_flags = [True, False, False, False, True]
-        concept = [self.censorer.vocabulary.get(c) for c in concept]
-        diagnoses_flags = self.censorer._get_diagnoses_flags(concept)
+        diagnoses_flags = self.censorer._get_diagnoses_flags([self.vocabulary[c] for c in concept])
         self.assertEqual(diagnoses_flags, expected_flags)
 
     def test_get_last_segment_before_timestamp(self):
-        segments = [0, 0, 0, 1, 1, 1, 2, 2, 2]
-        abspos = [0, 0, 0, 1.9, 4, 5, 5.5, 6, 7]
-        index_timestamp = 2
-        expected_segment = 1
-
-        last_segment = self.censorer._get_last_segment_before_timestamp(segments, abspos, index_timestamp)
-        self.assertEqual(last_segment, expected_segment)
+        last_segment = self.censorer._get_last_segment_before_timestamp([0, 0, 0, 1, 1, 1, 2, 2, 2], [0, 0, 0, 1.9, 4, 5, 5.5, 6, 7], 2)
+        self.assertEqual(last_segment, 1)
 
     def test_return_last_index_for_element(self):
-        lst = [0, 0, 1, 1, 1, 2]
-        element = 1
-        expected_index = 4
-
-        last_index = self.censorer._return_last_index_for_element(lst, element)
-        self.assertEqual(last_index, expected_index)
-
-    def test_censor(self):
-        result = self.censorer.censor(self.features, self.index_dates)
-        self.assertEqual(result, self.expected_result)
+        last_index = self.censorer._return_last_index_for_element([0, 0, 1, 1, 1, 2], 1)
+        self.assertEqual(last_index, 4)
 
     def test_combine_lists_with_and(self):
-        list1 = [True, False, True]
-        list2 = [True, True, False]
-        expected_result = [True, False, False]
+        self.run_combine_lists_test([True, False, True], [True, True, False], [True, False, False], self.censorer._combine_lists_with_and)
 
-        result = self.censorer._combine_lists_with_and(list1, list2)
-        self.assertEqual(result, expected_result)
-    
     def test_combine_lists_with_or(self):
-        list1 = [True, False, True]
-        list2 = [True, True, False]
-        expected_result = [True, True, True]
+        self.run_combine_lists_test([True, False, True], [True, True, False], [True, True, True], self.censorer._combine_lists_with_or)
 
-        result = self.censorer._combine_lists_with_or(list1, list2)
+    def run_combine_lists_test(self, list1, list2, expected_result, combine_func):
+        result = combine_func(list1, list2)
         self.assertEqual(result, expected_result)
-
 
 if __name__ == '__main__':
     unittest.main()
