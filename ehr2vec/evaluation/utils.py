@@ -145,6 +145,22 @@ def compute_and_save_scores_mean_std(n_splits:int, finetune_folder: str, mode='v
     date = datetime.now().strftime("%Y%m%d-%H%M")
     scores_mean_std.to_csv(join(finetune_folder, f'{mode}_scores_mean_std_{date}.csv'))
 
+def save_combined_predictions(n_splits:int, finetune_folder: str, mode='val')->None:
+    """Combine predictions from all folds and save to finetune folder."""
+    logger.info(f"Combine {mode} predictions")
+    predictions = []
+    for fold in range(1, n_splits+1):
+        fold_checkpoints_folder = join(finetune_folder, f'fold_{fold}', 'checkpoints')
+        last_epoch = max([int(f.split("_")[-2].split("epoch")[-1]) for f in os.listdir(fold_checkpoints_folder) if f.startswith('checkpoint_epoch')])
+        predictions_path = join(fold_checkpoints_folder, f'probas_{mode}_{last_epoch}.npz')
+        if not os.path.exists(predictions_path):
+            logger.warning(f"File {predictions_path} not found. Skipping fold {fold}.")
+            continue
+        fold_predictions = np.load(predictions_path, allow_pickle=True)['probas']
+        predictions.append(fold_predictions)
+    predictions = np.concatenate(predictions)
+    np.savez(join(finetune_folder, f'{mode}_predictions.npz'), probas=predictions)
+
 def check_data_for_overlap(train_data: Data, val_data: Data, test_data: Data=None)->None:
     """Check that there is no overlap between train, val and test data"""
     train_pids = set(train_data.pids)
