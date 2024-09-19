@@ -149,17 +149,24 @@ def save_combined_predictions(n_splits:int, finetune_folder: str, mode='val')->N
     """Combine predictions from all folds and save to finetune folder."""
     logger.info(f"Combine {mode} predictions")
     predictions = []
+    all_pids = []
     for fold in range(1, n_splits+1):
         fold_checkpoints_folder = join(finetune_folder, f'fold_{fold}', 'checkpoints')
         last_epoch = max([int(f.split("_")[-2].split("epoch")[-1]) for f in os.listdir(fold_checkpoints_folder) if f.startswith('checkpoint_epoch')])
         predictions_path = join(fold_checkpoints_folder, f'probas_{mode}_{last_epoch}.npz')
+        pids = torch.load(join(finetune_folder, f'fold_{fold}', f'{mode}_pids.pt'))
         if not os.path.exists(predictions_path):
             logger.warning(f"File {predictions_path} not found. Skipping fold {fold}.")
             continue
         fold_predictions = np.load(predictions_path, allow_pickle=True)['probas']
         predictions.append(fold_predictions)
+        all_pids.extend(pids)
     predictions = np.concatenate(predictions)
-    np.savez(join(finetune_folder, f'{mode}_predictions.npz'), probas=predictions)
+    if mode == 'test':
+        save_name = f'{mode}_predictions.npz'
+    else:
+        save_name = f'predictions.npz'
+    np.savez(join(finetune_folder, save_name), probas=predictions, pids=all_pids)
 
 def check_data_for_overlap(train_data: Data, val_data: Data, test_data: Data=None)->None:
     """Check that there is no overlap between train, val and test data"""
