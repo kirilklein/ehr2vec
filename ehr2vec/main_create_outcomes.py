@@ -15,7 +15,7 @@ from ehr2vec.data.concept_loader import ConceptLoaderLarge
 from ehr2vec.downstream_tasks.outcomes import OutcomeMaker
 
 BLOBSTORE = 'CINF'
-CONFIG_NAME = 'outcomes_test.yaml'
+CONFIG_NAME = 'outcomes_simvastatin.yaml'
 
 args = get_args(CONFIG_NAME)
 config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)

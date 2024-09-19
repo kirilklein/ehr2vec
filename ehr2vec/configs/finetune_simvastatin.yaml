@@ -21,7 +21,7 @@ model:
 data:
   num_patients: 500 #300
   val_split: 0.1
-  test_split: 0.1
+  test_split: 0
   truncation_len: 20
   # gender: M
   min_age: 40
@@ -36,10 +36,10 @@ data:
 
 outcome: 
   n_hours_censoring: -1 # censor time after index date (negative means before)
-  n_hours_start_follow_up: 1
+  n_hours_start_follow_up: -1
   first_time_outcomes_only: false # only consider patients with no outcome before index date/ patient with outcome before index date are excluded
-  censor_diag_end_of_visit: true
-  n_hours_diag_censoring: -1
+  censor_diag_end_of_visit: false
+  n_hours_diag_censoring: 720
   # index_date: # if all patients should have the same censor date
     # year: 2015
     # month: 01
@@ -55,15 +55,16 @@ trainer_args:
   batch_size: 128
   val_batch_size: 128
   effective_batch_size: 128
-  epochs: 5
+  epochs: 2
   info: true
   gradient_clip: 
     clip_value: 1.0
   mixed_precision: false
   shuffle: true
   checkpoint_frequency: 1
-  early_stopping: 5
+  early_stopping: 2
   stopping_criterion: roc_auc
+  num_workers: 4
   
 optimizer:
   lr: 5e-4
@@ -71,8 +72,8 @@ optimizer:
 
 scheduler:
   _target_: transformers.get_linear_schedule_with_warmup
-  num_warmup_steps: 10
-  num_training_steps: 100
+  num_warmup_steps: 2
+  num_training_steps: 10
 
 metrics:
   accuracy:
