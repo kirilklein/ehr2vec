@@ -29,7 +29,7 @@ from ehr2vec.feature_importance.shap_utils import (insert_shap_values,
 from ehr2vec.feature_importance.utils import log_most_important_features_deep
 from ehr2vec.trainer.utils import get_tqdm
 
-CONFIG_NAME = 'shap_deep_feature_importance.yaml'
+CONFIG_NAME = 'feature_importance/shap_deep_feature_importance.yaml'
 BLOBSTORE='CINF'
 
 args = get_args(CONFIG_NAME)

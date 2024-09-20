@@ -19,7 +19,7 @@ from ehr2vec.evaluation.utils import validate_outcomes
 from ehr2vec.model.model import BertEHREncoder
 
 BLOBSTORE = 'CINF'
-CONFIG_PATH = 'encode_concepts.yaml'
+CONFIG_PATH = 'encoding/encode_concepts.yaml'
 
 args = get_args(CONFIG_PATH)
 config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)

@@ -25,7 +25,7 @@ from ehr2vec.feature_importance.shap_utils import insert_concept_shap_values
 from ehr2vec.feature_importance.utils import log_most_important_features
 from ehr2vec.trainer.utils import get_tqdm
 
-CONFIG_NAME = 'shap_feature_importance.yaml'
+CONFIG_NAME = 'feature_importance/shap_feature_importance.yaml'
 BLOBSTORE='CINF'
 DEAFAULT_VAL_SPLIT = 0.2
 

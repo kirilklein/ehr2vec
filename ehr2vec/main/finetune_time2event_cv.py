@@ -17,7 +17,7 @@ from ehr2vec.evaluation.utils import (
     split_into_test_data_and_train_val_indices)
 from ehr2vec.trainer.trainer import EHRTrainer
 
-CONFIG_NAME = 'finetune_time2event.yaml'
+CONFIG_NAME = 'finetune/finetune_time2event.yaml'
 N_SPLITS = 2  # You can change this to desired value
 BLOBSTORE='CINF'
 DEAFAULT_VAL_SPLIT = 0.2

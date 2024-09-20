@@ -26,7 +26,7 @@ from ehr2vec.feature_importance.perturb_utils import average_sigmas, log_most_im
 from ehr2vec.trainer.trainer import EHRTrainer
 
 
-CONFIG_NAME = 'finetune_feature_importance.yaml'
+CONFIG_NAME = 'feature_importance/finetune_feature_importance.yaml'
 BLOBSTORE='CINF'
 DEAFAULT_VAL_SPLIT = 0.2
 

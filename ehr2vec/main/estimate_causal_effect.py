@@ -12,7 +12,7 @@ from ehr2vec.common.setup import (fix_tmp_prefixes_for_azure_paths, get_args,
                                   setup_logger)
 from pycaysal.api import estimator
 import numpy as np
-CONFIG_NAME = 'measure_effect.yaml'
+CONFIG_NAME = 'causal_inference/measure_effect.yaml'
 BLOBSTORE='CINF'
 
 args = get_args(CONFIG_NAME)

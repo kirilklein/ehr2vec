@@ -25,7 +25,7 @@ from ehr2vec.evaluation.utils import (
     check_data_for_overlap, save_data,
     split_into_test_data_and_train_val_indices)
 
-CONFIG_NAME = 'configs/finetune_stats.yaml'
+CONFIG_NAME = 'configs/finetune/finetune_stats.yaml'
 if len(sys.argv) > 1:
     # Use the first argument as the config file name
     CONFIG_NAME = sys.argv[1]
