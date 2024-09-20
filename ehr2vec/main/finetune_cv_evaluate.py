@@ -4,13 +4,14 @@ from os.path import abspath, dirname, join, split
 
 import pandas as pd
 import torch
-from ehr2vec.common.logger import log_config
-from ehr2vec.common.azure import  save_to_blobstore
+
+from ehr2vec.common.azure import save_to_blobstore
 from ehr2vec.common.initialize import ModelManager
+from ehr2vec.common.logger import log_config
 from ehr2vec.common.setup import (fix_tmp_prefixes_for_azure_paths, get_args,
+                                  initialize_configuration_finetune,
                                   setup_logger,
-                                  update_test_cfg_with_pt_ft_cfgs,
-                                  initialize_configuration_finetune)
+                                  update_test_cfg_with_pt_ft_cfgs)
 from ehr2vec.common.utils import Data
 from ehr2vec.data.dataset import BinaryOutcomeDataset
 from ehr2vec.data.prepare_data import DatasetPreparer
@@ -21,7 +22,7 @@ CONFIG_NAME = 'finetune/finetune_evaluate.yaml'
 BLOBSTORE='CINF'
 
 args = get_args(CONFIG_NAME)
-config_path = join(dirname(abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 def test_fold(cfg, finetune_folder: str, test_folder: str, fold:int, test_data: Data=None, run=None, logger=None)->None:

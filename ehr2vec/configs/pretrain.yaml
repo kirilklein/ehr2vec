@@ -57,11 +57,11 @@ scheduler:
 
 metrics:
   top1:
-    _target_: evaluation.metrics.PrecisionAtK
+    _target_: ehr2vec.evaluation.metrics.PrecisionAtK
     topk: 1
   top10:
-    _target_: evaluation.metrics.PrecisionAtK
+    _target_: ehr2vec.evaluation.metrics.PrecisionAtK
     topk: 10
   loss:
-    _target_: evaluation.metrics.LossAccessor
+    _target_: ehr2vec.evaluation.metrics.LossAccessor
     loss_name: loss

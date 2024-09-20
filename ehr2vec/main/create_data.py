@@ -9,9 +9,11 @@ Input: Formatted Data
 """
 import os
 import shutil
-from os.path import join
+from os.path import abspath, dirname, join
 
 import torch
+from tqdm import tqdm
+
 from ehr2vec.common.azure import AzurePathContext, save_to_blobstore
 from ehr2vec.common.config import load_config
 from ehr2vec.common.logger import TqdmToLogger
@@ -23,13 +25,12 @@ from ehr2vec.data.featuremaker import FeatureMaker
 from ehr2vec.data.tokenizer import EHRTokenizer
 from ehr2vec.data_fixes.exclude import Excluder
 from ehr2vec.data_fixes.handle import Handler
-from tqdm import tqdm
 
 CONFIG_NAME = 'create_data.yaml'
 BLOBSTORE = 'CINF'
 
 args = get_args(CONFIG_NAME, 'data_pretrain')
-config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 
 
 def main_data(config_path):

@@ -13,7 +13,8 @@ from ehr2vec.data.dataset import BinaryOutcomeDataset
 from ehr2vec.data.prepare_data import DatasetPreparer
 from ehr2vec.data.split import get_n_splits_cv, split_indices_into_train_val
 from ehr2vec.evaluation.utils import (
-    check_data_for_overlap, compute_and_save_scores_mean_std, save_data, save_combined_predictions,
+    check_data_for_overlap, compute_and_save_scores_mean_std,
+    save_combined_predictions, save_data,
     split_into_test_data_and_train_val_indices)
 from ehr2vec.trainer.trainer import EHRTrainer
 
@@ -23,7 +24,7 @@ BLOBSTORE='CINF'
 DEAFAULT_VAL_SPLIT = 0.2
 
 args = get_args(CONFIG_NAME)
-config_path = join(dirname(abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 

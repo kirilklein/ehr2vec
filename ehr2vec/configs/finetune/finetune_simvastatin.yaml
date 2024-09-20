@@ -49,7 +49,7 @@ outcome:
 trainer_args:
   sampler: true
   sample_weight_function:
-    _target_: evaluation.utils.inverse_sqrt # function to calculate sample weights
+    _target_: ehr2vec.evaluation.utils.inverse_sqrt # function to calculate sample weights
   sample_weight_multiplier: 1 # adjust the sampling weight of the positive class (1 is balanced)
   pos_weight: null # weight for positive class in the loss
   batch_size: 128
@@ -77,38 +77,19 @@ scheduler:
 
 metrics:
   accuracy:
-    _target_: evaluation.metrics.Accuracy
+    _target_: ehr2vec.evaluation.metrics.Accuracy
     threshold: 0.6
   balanced_accuracy:
-    _target_: evaluation.metrics.Balanced_Accuracy
+    _target_: ehr2vec.evaluation.metrics.Balanced_Accuracy
   precision:
-    _target_: evaluation.metrics.Precision
+    _target_: ehr2vec.evaluation.metrics.Precision
   recall:
-    _target_: evaluation.metrics.Recall
+    _target_: ehr2vec.evaluation.metrics.Recall
   roc_auc:
-    _target_: evaluation.metrics.ROC_AUC
+    _target_: ehr2vec.evaluation.metrics.ROC_AUC
   pr_auc:
-    _target_: evaluation.metrics.PR_AUC
-  dice:
-    _target_: evaluation.metrics.Dice
-  f1:
-    _target_: evaluation.metrics.F1
-  precentage_positives:
-    _target_: evaluation.metrics.Percentage_Positives
-  mean_probability:
-    _target_: evaluation.metrics.Mean_Probability
-  cohen_kappa:
-    _target_: evaluation.metrics.Cohen_Kappa
-  mathews_correlation:
-    _target_: evaluation.metrics.Matthews_Correlation_Coefficient
-  true_positives:
-    _target_: evaluation.metrics.True_Positives
-  true_negatives:
-    _target_: evaluation.metrics.True_Negatives
-  false_positives:
-    _target_: evaluation.metrics.False_Positives
-  false_negatives:
-    _target_: evaluation.metrics.False_Negatives
+    _target_: ehr2vec.evaluation.metrics.PR_AUC
+  
   
   
  

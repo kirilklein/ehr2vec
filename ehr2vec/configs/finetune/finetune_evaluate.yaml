@@ -6,18 +6,18 @@ paths:
   run_name: "evaluate"
 metrics:
   accuracy:
-    _target_: evaluation.metrics.Accuracy
+    _target_: ehr2vec.evaluation.metrics.Accuracy
     threshold: 0.6
   balanced_accuracy:
-    _target_: evaluation.metrics.Balanced_Accuracy
+    _target_: ehr2vec.evaluation.metrics.Balanced_Accuracy
   precision:
-    _target_: evaluation.metrics.Precision
+    _target_: ehr2vec.evaluation.metrics.Precision
   recall:
-    _target_: evaluation.metrics.Recall
+    _target_: ehr2vec.evaluation.metrics.Recall
   roc_auc:
-    _target_: evaluation.metrics.ROC_AUC
+    _target_: ehr2vec.evaluation.metrics.ROC_AUC
   pr_auc:
-    _target_: evaluation.metrics.PR_AUC
+    _target_: ehr2vec.evaluation.metrics.PR_AUC
 
 tester_args:
   batch_size: 16

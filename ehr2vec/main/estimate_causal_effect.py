@@ -3,20 +3,22 @@ import os
 from datetime import datetime
 from os.path import abspath, dirname, join, split
 
+import numpy as np
 import pandas as pd
+from pycaysal.api import estimator
+
 from ehr2vec.common.azure import save_to_blobstore
 from ehr2vec.common.calibration import calibrate_cv
 from ehr2vec.common.loader import load_predictions_from_finetune_dir
 from ehr2vec.common.logger import log_config
 from ehr2vec.common.setup import (fix_tmp_prefixes_for_azure_paths, get_args,
                                   setup_logger)
-from pycaysal.api import estimator
-import numpy as np
+
 CONFIG_NAME = 'causal_inference/measure_effect.yaml'
 BLOBSTORE='CINF'
 
 args = get_args(CONFIG_NAME)
-config_path = join(dirname(abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 

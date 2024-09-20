@@ -5,9 +5,10 @@
 
 import os
 import shutil
-from os.path import join
+from os.path import abspath, dirname, join
 
 import torch
+
 from ehr2vec.common.azure import AzurePathContext, save_to_blobstore
 from ehr2vec.common.config import load_config
 from ehr2vec.common.io import PatientHDF5Writer
@@ -24,7 +25,7 @@ CONFIG_PATH = 'encoding/encode_censored.yaml'
 
 args = get_args(CONFIG_PATH, "encode_censored")
 config_path = args.config_path
-config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 
 # !TODO: adjust this, use functions from Directorypreparer.
 def _get_output_path_name(dataset, cfg):

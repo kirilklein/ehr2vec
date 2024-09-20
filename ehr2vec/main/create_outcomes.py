@@ -1,7 +1,6 @@
 """Create tokenized features from formatted data. config template: data.yaml"""
-import os
 from collections import defaultdict
-from os.path import join
+from os.path import abspath, dirname, join
 
 import pandas as pd
 from tqdm import tqdm
@@ -18,7 +17,8 @@ BLOBSTORE = 'CINF'
 CONFIG_NAME = 'outcome/outcomes_simvastatin.yaml'
 
 args = get_args(CONFIG_NAME)
-config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
+
 
             
 def process_data(loader, cfg, features_cfg, logger)->dict:

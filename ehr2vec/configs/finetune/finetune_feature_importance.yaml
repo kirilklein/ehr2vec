@@ -7,9 +7,9 @@ paths:
 
 metrics:
   roc_auc:
-    _target_: evaluation.metrics.ROC_AUC
+    _target_: ehr2vec.evaluation.metrics.ROC_AUC
   pr_auc:
-    _target_: evaluation.metrics.PR_AUC
+    _target_: ehr2vec.evaluation.metrics.PR_AUC
 model:
   lambda: .001
   scale_with_frequency: true
@@ -20,7 +20,7 @@ data:
 trainer_args:
   sampler: true
   sample_weight_function:
-    _target_: evaluation.utils.inverse_sqrt # function to calculate sample weights
+    _target_: ehr2vec.evaluation.utils.inverse_sqrt # function to calculate sample weights
   sample_weight_multiplier: 1 # adjust the sampling weight of the positive class (1 is balanced)
   pos_weight: null # weight for positive class in the loss
   batch_size: 8

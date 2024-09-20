@@ -14,7 +14,7 @@ from ehr2vec.common.azure import save_to_blobstore
 from ehr2vec.common.initialize import Initializer
 from ehr2vec.common.loader import load_and_select_splits
 from ehr2vec.common.setup import (DirectoryPreparer, copy_data_config,
-                                  copy_pretrain_config)
+                                  copy_pretrain_config, get_args)
 from ehr2vec.common.utils import Data
 from ehr2vec.data.prepare_data import DatasetPreparer
 from ehr2vec.data.split import get_n_splits_cv
@@ -32,8 +32,8 @@ if len(sys.argv) > 1:
 
 BLOBSTORE='CINF'
 N_SPLITS = 2
-
-config_path = join(dirname(abspath(__file__)), CONFIG_NAME)
+args = get_args(CONFIG_NAME)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 

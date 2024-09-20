@@ -3,16 +3,17 @@ This script is used to embed concepts into a vector space.
 !Currently, this script is not used in the paper. It is a first attempt to evaluate the RF model.
 """
 import os
-import pandas as pd
-from os.path import join
+from os.path import abspath, dirname, join
 
+import pandas as pd
 import torch
+
 from ehr2vec.common.azure import AzurePathContext, save_to_blobstore
 from ehr2vec.common.config import load_config
-from ehr2vec.common.loader import ModelLoader
-from ehr2vec.common.setup import get_args, DirectoryPreparer 
-from ehr2vec.common.utils import ConcatIterableDataset
 from ehr2vec.common.io import ConceptHDF5Writer
+from ehr2vec.common.loader import ModelLoader
+from ehr2vec.common.setup import DirectoryPreparer, get_args
+from ehr2vec.common.utils import ConcatIterableDataset
 from ehr2vec.data.dataset import BaseEHRDataset
 from ehr2vec.evaluation.encodings import Forwarder
 from ehr2vec.evaluation.utils import validate_outcomes
@@ -22,7 +23,7 @@ BLOBSTORE = 'CINF'
 CONFIG_PATH = 'encoding/encode_concepts.yaml'
 
 args = get_args(CONFIG_PATH)
-config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 
 def main(config_path):
     """Encode selected concepts associated with patients with certain outcomes."""

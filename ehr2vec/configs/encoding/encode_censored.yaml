@@ -28,7 +28,7 @@ outcomes:
 forwarder_args:
   batch_size: 512
   pooler:
-    _target_: evaluation.poolings.MeanPooling
+    _target_: ehr2vec.evaluation.poolings.MeanPooling
   
     
  

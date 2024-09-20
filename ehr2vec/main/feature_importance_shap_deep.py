@@ -33,7 +33,7 @@ CONFIG_NAME = 'feature_importance/shap_deep_feature_importance.yaml'
 BLOBSTORE='CINF'
 
 args = get_args(CONFIG_NAME)
-config_path = join(dirname(abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -1,6 +1,6 @@
 """Pretrain BERT model on EHR data. Use config_template pretrain.yaml. Run main_data_pretrain.py first to create the dataset and vocabulary."""
 import os
-from os.path import join
+from os.path import abspath, dirname, join
 
 from ehr2vec.common.azure import AzurePathContext, save_to_blobstore
 from ehr2vec.common.config import load_config
@@ -16,7 +16,7 @@ CONFIG_NAME = 'pretrain.yaml'
 BLOBSTORE = 'CINF'
 
 args = get_args(CONFIG_NAME)
-config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), args.config_path)
+config_path = join(dirname(dirname(abspath(__file__))), args.config_path)
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 def main_train(config_path):
